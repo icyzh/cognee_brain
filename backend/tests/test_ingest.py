@@ -75,6 +75,24 @@ def test_source_paths_are_stable():
     assert "adrs/ADR-007.md" in {r["path"] for r in RECORDS}
 
 
+def test_semantic_only_formats():
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        files = {"Standup notes 04-02.txt": b"Priya: cutover Sunday.", "notes.md": b"# Just notes\nno frontmatter",
+                 "export.json": b'[{"a": 1}]', "call.mp3": b"ID3fake", "whiteboard.PNG": b"\x89PNG", "README.md": b"bible",
+                 "tool.exe": b"MZ"}
+        for n, b in files.items():
+            (d / n).write_bytes(b)
+        recs = {r["ref"]: r for r in loaders.load(d)}
+    assert {k: v["type"] for k, v in recs.items()} == {
+        "Standup-notes-04-02": "doc", "notes": "doc", "export": "doc", "call": "audio", "whiteboard": "image"}
+    assert recs["call"]["suffix"] == ".mp3" and recs["whiteboard"]["suffix"] == ".png" and "file" in recs["call"]
+    assert recs["Standup-notes-04-02"]["body"] == "Priya: cutover Sunday."
+    assert all(structural.triples(r) == [] for r in recs.values())  # semantic-only: no metadata edges
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

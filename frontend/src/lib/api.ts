@@ -64,7 +64,8 @@ export async function ask(question: string): Promise<AskResponse> {
     await delay(1200);
     return [SHOWCASE_QUESTION, OWNER_QUESTION].includes(question.trim()) ? mockAsk : mockRefusal;
   }
-  return request("/ask", { question });
+  // Cognee Cloud /search runs 10–25 s; the backend budget is 40 s (cached fallback after 25 s)
+  return request("/ask", { question }, 45_000);
 }
 
 export async function feedback(qa_id: number, helpful: boolean): Promise<void> {

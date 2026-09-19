@@ -10,7 +10,8 @@ concept literally named "data" merges into Team:data in /graph; namespace IDs if
 from app import cognee_client
 from app.config import COGNEE_DATASET
 
-TYPE_BY_RECORD = {"adr": "Decision", "ticket": "Ticket", "meeting": "Meeting"}
+TYPE_BY_RECORD = {"adr": "Decision", "ticket": "Ticket", "meeting": "Meeting",
+                  "doc": "Document", "image": "Document", "audio": "Document", "video": "Document"}
 
 
 def norm(name: str) -> str:

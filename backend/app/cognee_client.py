@@ -5,6 +5,7 @@ on search (spike S2/S5).
 """
 
 import asyncio
+import mimetypes
 import re
 import uuid
 from typing import TypedDict
@@ -47,7 +48,13 @@ def render_triples(triples: list[tuple[str, str, str]]) -> str:
 
 async def add_text(text: str, node_set: list[str], dataset: str, filename: str | None = None) -> str:
     """/add one document. Returns its data_id (stored in app.db sources)."""
-    files = {"data": (filename or f"{uuid.uuid4().hex}.txt", text.encode(), "text/plain")}
+    return await add_file(text.encode(), filename or f"{uuid.uuid4().hex}.txt", node_set, dataset, "text/plain")
+
+
+async def add_file(data: bytes, filename: str, node_set: list[str], dataset: str, content_type: str | None = None) -> str:
+    """/add raw bytes; Cognee picks the loader by extension (pdf, images, audio, video...).
+    The TextDocument is named after the file stem, which is how evidence maps back to the source."""
+    files = {"data": (filename, data, content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream")}
     async with _client() as c:
         for attempt in range(3):  # Cloud drops connections under parallel load (seen: 409 "connection was closed")
             try:
@@ -137,7 +144,7 @@ def clean(text: str) -> str:
     return (text or "").translate(_TYPO)
 
 
-async def ask(question: str, dataset: str = COGNEE_DATASET, timeout: float = 23, system_prompt: str | None = SYSTEM_PROMPT) -> RawResult:
+async def ask(question: str, dataset: str = COGNEE_DATASET, timeout: float = 40, system_prompt: str | None = SYSTEM_PROMPT) -> RawResult:
     """/search GRAPH_COMPLETION, verbose, fresh sessionId (S5: the default session leaks earlier Q&A).
 
     chunks[].source_ref = the ref of the file the chunk came from: the TextDocument is named after our
@@ -151,7 +158,7 @@ async def ask(question: str, dataset: str = COGNEE_DATASET, timeout: float = 23,
     if system_prompt:
         payload["systemPrompt"] = system_prompt
     loop = asyncio.get_running_loop()
-    deadline = loop.time() + timeout  # overall budget, retry included (the frontend aborts at 25 s)
+    deadline = loop.time() + timeout  # overall budget, retry included (the frontend aborts at 45 s)
     async with _client() as c:
         for attempt in range(2):  # one retry on rate limit / server error, only if it still fits
             resp = await c.post("/search", json=payload, timeout=max(1.0, deadline - loop.time()))

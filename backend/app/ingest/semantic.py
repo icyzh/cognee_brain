@@ -21,6 +21,10 @@ def render(rec: dict) -> str | None:
         ]
         lines += [f"{p['id']} is {p.get('name', '')}, also called {', '.join(p.get('aliases', []))}." for p in people.values()]
         head = "[ORG CHART]\n" + "\n".join(lines)
+    elif rec["type"] == "doc" and rec["body"]:  # semantic-only text (txt, csv, notes without frontmatter)
+        head = f"[DOCUMENT {rec['ref']}]"
+    elif rec["type"] in ("audio", "video", "image") and rec["body"]:  # transcript / description (media.py)
+        head = f"[{rec['type'].upper()} {rec['ref']}] {'description' if rec['type'] == 'image' else 'transcript'}:"
     else:
-        return None
+        return None  # raw docs (pdf, office) go to Cognee as the file itself
     return f"{head}\n\n{rec['body']}".strip()

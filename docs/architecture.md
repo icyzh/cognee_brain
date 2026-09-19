@@ -258,6 +258,8 @@ flowchart LR
 
 Cognee Cloud has no REST route for custom `DataPoint`s (`add_data_points` is in-process only; spike S3). Structural edges are therefore sent as canonical text triples into `/add` (`node_set=structural`), and P1 checks that every expected edge exists in `GET /datasets/{id}/graph`. A `/cognify` `graphModel` JSON schema can type the nodes if needed. Citations come from the `DocumentChunk`s in the search result: each chunk's `TextDocument` is named after our upload filename (the ref, e.g. `ADR-007`), which `app.db` `sources.ref` maps back to the seed file. Chunks from triples docs are not used as evidence. The same triples doc also carries metadata fact sentences (`structural.facts`: title, status, date), because retrieval favors that small doc for ID-centric questions; they are never used as edges.
 
+**Semantic-only files** (txt, pdf, office docs, images, audio, video) have no metadata, so no triples: they are searchable and cited, but never on a verified path. Audio and video are transcribed and images described with our own OpenAI key first (`app/ingest/media.py`), because Cognee Cloud's hosted model isn't multimodal; PDFs go to Cognee's own loader.
+
 `cognify` also creates its own node types alongside ours: `TextDocument`, `DocumentChunk`, `TextSummary`, `Entity`, `EntityType` and `NodeSet` (spike S9). The graph explorer should hide or dim them.
 
 ---

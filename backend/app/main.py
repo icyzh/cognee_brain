@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import logging
 import re
 import sqlite3
@@ -18,7 +20,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from app import cognee_client, store
 from app.analysis import timeline as decision_timeline
-from app.config import COGNEE_DATASET, COGNEE_SERVICE_URL, DATA_DIR
+from app.config import APP_DB, COGNEE_DATASET, COGNEE_SERVICE_URL, DATA_DIR
 from app.ingest import __main__ as ingest
 from app.ingest import align, loaders, structural
 from app.logs import jlog, request_id
@@ -90,13 +92,15 @@ def health():
 _ingest_lock = asyncio.Lock()
 
 
-MAX_UPLOAD = 1_000_000
+MAX_UPLOAD = 1_000_000  # structured and text docs
+MAX_MEDIA_UPLOAD = 50_000_000  # pdf, images, audio, video (sent to Cognee as the file)
 
 
 @app.post("/ingest")
 async def ingest_route(reset: bool = False, file: UploadFile | None = File(None)):
     """No file: batch ingest of data/seed (minutes on a fresh graph). With a multipart `file`: live ingest
-    of one ADR/meeting/ticket into data/live + contradiction checks → IngestResult."""
+    of one file into data/live → IngestResult. ADR / meeting / ticket get contradiction checks; any other
+    format Cognee reads (txt, pdf, docs, images, audio, video) is ingested semantic-only."""
     if _ingest_lock.locked():
         raise HTTPException(409, "ingest already running (a live upload's graph build takes ~30 s)")
     await _ingest_lock.acquire()
@@ -106,22 +110,25 @@ async def ingest_route(reset: bool = False, file: UploadFile | None = File(None)
             return await ingest.ingest(reset=reset)
         else:
             name = Path(file.filename or "").name  # never trust client paths
-            if name.startswith(".") or not name.endswith((".md", ".json")):
-                raise HTTPException(400, "upload a .md or .json document")
-            data = await file.read(MAX_UPLOAD + 1)
-            if len(data) > MAX_UPLOAD:
-                raise HTTPException(413, "file too large")
+            suffix = Path(name).suffix.lower()
+            if name.startswith(".") or suffix not in loaders.SUPPORTED_EXT:
+                raise HTTPException(400, f"unsupported file type; use one of {' '.join(sorted(loaders.SUPPORTED_EXT))}")
+            limit = MAX_MEDIA_UPLOAD if suffix in loaders.KIND_BY_EXT else MAX_UPLOAD
+            data = await file.read(limit + 1)
+            if len(data) > limit:
+                raise HTTPException(413, f"file too large (limit {limit // 1_000_000} MB for {suffix})")
             dest = DATA_DIR / "live" / name
             dest.parent.mkdir(parents=True, exist_ok=True)
             tmp = dest.with_name(f".upload-{name}")  # dotfiles are never loaded as data
             tmp.write_bytes(data)
             try:
-                recs = loaders.load(tmp)
+                rec = loaders.load_file(tmp, name=name)
             except (ValueError, yaml.YAMLError, KeyError):  # JSONDecodeError is a ValueError
-                recs = []
+                rec = None
+            recs = [rec] if rec else []
             if not recs:
                 tmp.unlink()
-                raise HTTPException(400, "not a recognisable document (needs frontmatter/JSON with an id)")
+                raise HTTPException(400, "not a readable document (broken frontmatter or JSON?)")
             if recs[0]["ref"] in {r["ref"] for r in loaders.load(DATA_DIR / "seed")}:
                 tmp.unlink()
                 raise HTTPException(409, f"{recs[0]['ref']} is a seed document; uploads can't replace it")
@@ -210,7 +217,7 @@ class FeedbackRequest(BaseModel):
 async def ask(req: AskRequest, raw: bool = False):
     """raw=true: plain Cognee on the same question, for the side-by-side demo.
 
-    Cached fallback (P5): if this question was answered before, the live call gets 20 s; on a timeout or
+    Cached fallback (P5): if this question was answered before, the live call gets 25 s; on a timeout or
     Cognee error the last answer is served, flagged `cached: true` (and logged), never hidden.
     """
     fallback = None if raw else ask_pipeline.cached(req.question)
@@ -218,7 +225,7 @@ async def ask(req: AskRequest, raw: bool = False):
     try:
         if raw:
             return await ask_pipeline.ask_raw(req.question)
-        return await asyncio.wait_for(ask_pipeline.ask(req.question), 20 if fallback else None)
+        return await asyncio.wait_for(ask_pipeline.ask(req.question), 25 if fallback else None)
     except Exception as e:
         if fallback:  # any failure, not just Cognee errors: the demo question still answers
             jlog("ask_fallback", reason=repr(e), qa_id=fallback.get("qa_id"))
@@ -255,14 +262,28 @@ def sources():
 
 
 @app.get("/graph/cognee")
-async def graph_cognee(full: bool = False, query: str | None = None):
-    """Proxies Cognee's rendered graph page so the API key stays server-side; the frontend iframes it."""
+async def graph_cognee(full: bool = False, query: str | None = None, refresh: bool = False):
+    """Proxies Cognee's rendered graph page so the API key stays server-side; the frontend iframes it.
+
+    Cognee Cloud takes ~30 s to render the page (3 MB), so the default view is cached on disk, keyed by the
+    ingested sources: any ingest or --forget changes the key, and the next request re-renders."""
     params = {"full": full} | ({"query": query} if query else {})
+    key = hashlib.sha256(json.dumps([(s["path"], s["ingested_at"]) for s in store.list_sources()]).encode()).hexdigest()[:16]
+    cached = APP_DB.parent / ".cache" / f"cognee_view-{key}.html"
+    plain = not full and not query
+    if plain and not refresh and cached.exists():
+        return HTMLResponse(cached.read_text())
     try:
-        return HTMLResponse(await cognee_client.visualize_html(**params))
+        html = await cognee_client.visualize_html(**params)
     except RuntimeError as e:
         logging.exception("visualize failed")
         raise HTTPException(502, {"error": "knowledge layer error", "retryable": True}) from e
+    if plain:
+        cached.parent.mkdir(exist_ok=True)
+        for stale in cached.parent.glob("cognee_view-*.html"):
+            stale.unlink()
+        cached.write_text(html)
+    return HTMLResponse(html)
 
 
 @app.get("/graph")

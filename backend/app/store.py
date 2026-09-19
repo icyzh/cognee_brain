@@ -205,11 +205,11 @@ def recent_answers(limit: int = 6) -> list[dict]:
 
 
 def last_answer(question: str) -> dict | None:
-    """Most recent *grounded* /ask response for this question (the cached fallback, P5): a cached refusal
-    would hide an outage and throw away an earlier good answer."""
+    """The cached fallback (P5): the most recent *grounded* answer to this question, else its most recent
+    refusal (so the demo's refusal step can't 504 either). A grounded answer always wins over a refusal."""
     with closing(connect()) as conn:
         r = conn.execute(
-            "SELECT id, response_json FROM qa_log WHERE lower(trim(question)) = lower(trim(?)) AND grounded = 1 ORDER BY id DESC LIMIT 1",
+            "SELECT id, response_json FROM qa_log WHERE lower(trim(question)) = lower(trim(?)) ORDER BY grounded DESC, id DESC LIMIT 1",
             (question,),
         ).fetchone()
     return json.loads(r["response_json"]) | {"qa_id": r["id"]} if r else None  # qa_id is assigned after the JSON is stored

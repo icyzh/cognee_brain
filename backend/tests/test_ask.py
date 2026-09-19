@@ -95,12 +95,18 @@ def test_bare_team_ids_in_prose_are_not_targets():
 
 def test_evidence_only_cited_files_triples_count():
     ask.store.get_source_by_ref = lambda ref: {"ref": ref, "type": "ticket", "path": f"tickets/{ref}.json"}
+    ask.store.list_sources = lambda: []  # no ingested semantic-only files in this test
     raw = {"answer": "svc-reports is affected by TCK-118.", "triplets": [], "chunks": [
         {"text": "TCK-112 about svc-notify.", "source_ref": "TCK-112.triples"},
         {"text": "TCK-118 assigned_to diego. TCK-118 about svc-reports.", "source_ref": "TCK-118.triples"},
         {"text": "[TICKET TCK-128] Office wifi keeps dropping.", "source_ref": "TCK-128"},
     ]}
     assert [e["ref"] for e in ask.evidence(raw, {"reports"})] == ["TCK-118"]
+    raw["chunks"].append({"text": "[AUDIO standup] transcript: cutover Sunday.", "source_ref": "standup-0402"})
+    assert [e["ref"] for e in ask.evidence(raw, {"reports"})] == ["TCK-118", "standup-0402"]  # no ID to cite: still evidence
+    raw["chunks"].pop()
+    named = raw | {"answer": "Per TCK-118 and TCK-112 and TCK-128 (see standup-0402).", "chunks": raw["chunks"] + [{"text": "x", "source_ref": "standup-0402"}]}
+    assert [e["ref"] for e in ask.evidence(named, set())][0] == "standup-0402"  # named in the answer: first
     raw["answer"] = "Nothing cited here."  # no IDs cited: top-k in relevance order
     assert [e["ref"] for e in ask.evidence(raw, set())] == ["TCK-112", "TCK-118", "TCK-128"]
 

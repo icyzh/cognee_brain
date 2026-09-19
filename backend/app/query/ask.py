@@ -5,12 +5,13 @@ import re
 import time
 
 from app import cognee_client, store
-from app.ingest import structural
+from app.config import DATA_DIR
+from app.ingest import loaders, media, structural
 from app.logs import jlog
 from app.query import paths
 
 REFUSAL = "I couldn't find this in company knowledge."
-SOURCE_TYPES = {"adr", "ticket", "meeting", "org"}
+SOURCE_TYPES = {"adr", "ticket", "meeting", "org", "doc", "image", "audio", "video"}
 _WORD = re.compile(r"[a-z0-9-]{4,}")
 _ID = re.compile(r"\b[A-Z]{2,4}-\d{3,4}\b")
 _NOT_FOUND = re.compile(r"\bnot[\s_-]?found\b|\bno (?:relevant )?information\b", re.I)
@@ -49,7 +50,9 @@ def evidence(raw: cognee_client.RawResult, terms: set[str], k: int = 3) -> list[
 
     If the answer cites IDs, only those files count (otherwise top-k filled up with whatever was
     retrieved, e.g. an office-wifi ticket). A file's triples doc ("TCK-118.triples") is evidence for
-    that file too; its prose chunk is preferred when both were retrieved.
+    that file too; its prose chunk is preferred when both were retrieved. Semantic-only files (a pdf, a
+    recording, a whiteboard photo) have no ID the answer could cite, so they count whenever Cognee
+    retrieved them for this question.
     """
     cited = set(_ID.findall(raw["answer"]))
     by_ref: dict[str, dict] = {}
@@ -57,17 +60,45 @@ def evidence(raw: cognee_client.RawResult, terms: set[str], k: int = 3) -> list[
         if not ch["source_ref"]:
             continue
         ref = ch["source_ref"].removesuffix(".triples")
-        if (cited and ref not in cited) or (ref in by_ref and not by_ref[ref]["triples"]):
+        if (cited and ref not in cited and _ID.fullmatch(ref)) or (ref in by_ref and not by_ref[ref]["triples"]):
             continue
         by_ref[ref] = {"text": ch["text"], "triples": ch["source_ref"].endswith(".triples"), "order": by_ref.get(ref, {}).get("order", len(by_ref))}
+    for ref in _named_semantic_refs(raw["answer"], exclude=set(by_ref)):  # named but only its summary was retrieved
+        by_ref[ref] = {"text": _local_text(ref), "triples": False, "order": len(by_ref)}
     out = []
-    for ref, ch in sorted(by_ref.items(), key=lambda kv: kv[1]["order"]):
+    # semantic-only files the answer names ("AUDIO platform-standup-0402") go first: ID-cited files would
+    # otherwise fill all k slots, and these have no ID to be cited by
+    named = raw["answer"].lower()
+    first = lambda ref: ref.lower() in named and not _ID.fullmatch(ref)  # noqa: E731
+    for ref, ch in sorted(by_ref.items(), key=lambda kv: (not first(kv[0]), kv[1]["order"])):
         src = store.get_source_by_ref(ref)
         if src and src["type"] in SOURCE_TYPES:
             out.append({"source": src["type"], "ref": ref, "path": src["path"], "snippet": snippet(ch["text"], terms)})
         if len(out) == k:
             break
     return out
+
+
+SEMANTIC_ONLY = {"doc", "image", "audio", "video"}
+
+
+def _named_semantic_refs(answer: str, exclude: set[str]) -> list[str]:
+    """Ingested semantic-only files the answer names by ref (e.g. "AUDIO platform-standup-0402")."""
+    text = answer.lower()
+    return [s["ref"] for s in store.list_sources()
+            if s["type"] in SEMANTIC_ONLY and s["ref"] not in exclude and s["ref"].lower() in text]
+
+
+def _local_text(ref: str) -> str:
+    """Our own copy of a semantic-only file's text: the transcript/description sidecar, or the text file."""
+    src = store.get_source_by_ref(ref)
+    path = next((b / src["path"] for b in (DATA_DIR / "seed", DATA_DIR) if (b / src["path"]).exists()), None) if src else None
+    if not path:
+        return ""
+    side = media.sidecar(path)
+    if side.exists():
+        return side.read_text()
+    return path.read_text(errors="replace") if path.suffix.lower() in loaders.TEXT_EXT else ""
 
 
 def supersede_check(decisions: list[str], adrs: dict[str, dict]) -> list[dict]:

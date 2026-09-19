@@ -1,7 +1,15 @@
-"""Parse seed files (md + YAML frontmatter, JSON) into records with a content hash."""
+"""Parse company files into records with a content hash.
+
+Structured (ADR / meeting .md with frontmatter `id`, ticket .json, team.json): canonical IDs, metadata
+edges, stale and contradiction checks. Anything else Cognee can read is "semantic-only": text formats
+are sent as text ("doc"), other files as the raw file for Cognee's loaders (pdf and office docs, images
+via a vision model, audio and video via transcription). Semantic-only files are searchable and cited
+as evidence, but have no metadata edges, so no verified path or stale check.
+"""
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -9,6 +17,20 @@ import yaml
 from app.config import DATA_DIR
 
 TYPE_BY_DIR = {"adrs": "adr", "tickets": "ticket", "meetings": "meeting"}
+TEXT_EXT = {".txt", ".md", ".markdown", ".csv", ".log", ".html", ".htm", ".xml", ".yaml", ".yml", ".json"}
+FILE_KIND = {  # raw files Cognee's loaders handle (extensions as in cognee.infrastructure.loaders)
+    "doc": {".pdf", ".docx", ".doc", ".pptx", ".xlsx", ".odt", ".rtf", ".epub"},
+    "image": {".png", ".jpg", ".jpeg", ".webp", ".gif", ".tif", ".tiff", ".bmp", ".heic"},
+    "audio": {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".aiff"},
+    "video": {".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi"},
+}
+KIND_BY_EXT = {ext: kind for kind, exts in FILE_KIND.items() for ext in exts}
+SUPPORTED_EXT = TEXT_EXT | set(KIND_BY_EXT)
+
+
+def ref_for(name: str) -> str:
+    """A file's ref for semantic-only docs: its name without extension, e.g. "standup-2026-04-02"."""
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", Path(name).stem).strip("-")[:64] or "doc"
 
 
 def parse_md(text: str) -> tuple[dict, str]:
@@ -28,22 +50,32 @@ def source_path(path: Path) -> str:
     return p.name
 
 
-def load_file(path: Path) -> dict | None:
-    text = path.read_text()
-    rel = source_path(path)
-    base = {"path": rel, "hash": hashlib.sha256(text.encode()).hexdigest()}
-    if path.name == "team.json":
+def load_file(path: Path, name: str | None = None) -> dict | None:
+    """`name` = the real file name when `path` is a temp copy (upload validation)."""
+    name = name or path.name
+    suffix = Path(name).suffix.lower()
+    if name.startswith(".") or name == "README.md" or suffix not in SUPPORTED_EXT:
+        return None  # README.md = the story bible, not company data
+    data = path.read_bytes()  # ponytail: media is hashed on every load(DATA_DIR); cache by mtime if files get big
+    base = {"path": source_path(path), "hash": hashlib.sha256(data).hexdigest()}
+    if suffix in KIND_BY_EXT:
+        return base | {"type": KIND_BY_EXT[suffix], "ref": ref_for(name), "meta": {}, "body": "", "file": str(path), "suffix": suffix}
+    text = data.decode("utf-8", errors="replace")
+    doc = base | {"type": "doc", "ref": ref_for(name), "meta": {}, "body": text}
+    if name == "team.json":
         return base | {"type": "org", "ref": "team", "meta": json.loads(text), "body": ""}
-    if path.suffix == ".json":
+    if suffix == ".json":
         meta = json.loads(text)
-        return base | {"type": "ticket", "ref": meta["id"], "meta": meta, "body": meta.get("body", "")}
-    if path.suffix == ".md" and path.name != "README.md":
+        if isinstance(meta, dict) and isinstance(meta.get("id"), str):
+            return base | {"type": "ticket", "ref": meta["id"], "meta": meta, "body": meta.get("body", "")}
+        return doc
+    if suffix in (".md", ".markdown"):
         meta, body = parse_md(text)
-        if "id" not in meta:
-            return None
+        if not isinstance(meta, dict) or "id" not in meta:
+            return doc  # plain Markdown notes: semantic-only
         type_ = TYPE_BY_DIR.get(path.parent.name) or ("adr" if meta["id"].startswith("ADR-") else "meeting")
         return base | {"type": type_, "ref": meta["id"], "meta": meta, "body": body}
-    return None
+    return doc
 
 
 def load(root: Path) -> list[dict]:

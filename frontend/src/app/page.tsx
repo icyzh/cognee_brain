@@ -103,6 +103,16 @@ const FEATURES: { title: string; body: ReactNode; icon: ReactNode }[] = [
   },
 ];
 
+// Cognee alone → what the harness adds → the evidence (docs/usp.png, README "A harness, not a wrapper").
+const HARNESS: { alone: string; adds: string; how: string; proof: string }[] = [
+  { alone: "Trusts every edge its LLM extracts", adds: "Graph integrity verification", how: "Edges must exist in both source metadata and the graph. A missing edge fails the ingest.", proof: "129 verified edges" },
+  { alone: "Returns an answer and loose triplets", adds: "Deterministic provenance path", how: "Service → Decision → Meeting → Person → Team, computed in code over verified edges.", proof: "path 5/5 vs 0/5" },
+  { alone: "Cites a superseded decision as current", adds: "Supersession enforcement", how: "The stale warning is attached in code after retrieval, so the model cannot skip it.", proof: "stale 2/2 vs 1/2" },
+  { alone: "Ingests a conflicting document silently", adds: "Conflict detection on ingest", how: "New claims are judged against active decisions on the same service, one pair at a time.", proof: "alert in ~8 s" },
+  { alone: "No record of what was in force, and when", adds: "Temporal validity", how: "Superseded decisions are closed, never deleted. Ask what was true on any date.", proof: "as-of queries" },
+  { alone: "\u201CWho should I ask?\u201D is whoever the LLM names", adds: "Evidence-ranked expert routing", how: "Personalized PageRank over verified edges: decisions owned, meetings attended, tickets assigned.", proof: "top 3, with teams" },
+];
+
 const STEPS: { title: string; body: ReactNode }[] = [
   {
     title: "Ingest",
@@ -231,6 +241,7 @@ export default function Home() {
             </a>
             <nav aria-label="Primary" className="hidden gap-8 text-sm text-zinc-600 dark:text-zinc-400 md:flex">
               <a href="#features" className="hover:text-zinc-950 dark:hover:text-zinc-50">Features</a>
+              <a href="#harness" className="hover:text-zinc-950 dark:hover:text-zinc-50">Harness</a>
               <a href="#architecture" className="hover:text-zinc-950 dark:hover:text-zinc-50">Architecture</a>
               <a href="#how" className="hover:text-zinc-950 dark:hover:text-zinc-50">How it works</a>
               <a href={DOCS} className="hover:text-zinc-950 dark:hover:text-zinc-50">Docs</a>
@@ -261,11 +272,11 @@ export default function Home() {
       <main>
         <section id="top" className="flex flex-col items-center gap-7 px-4 pt-20 text-center sm:px-6 sm:pt-28">
           <a
-            href="#architecture"
+            href="#harness"
             className="flex items-center gap-2 rounded-full border border-zinc-200 dark:border-zinc-800 py-1.5 pl-3.5 pr-3.5 text-[13px] text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 sm:pr-1.5"
           >
-            Company memory that never melts
-            <span className="hidden rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 font-medium text-zinc-950 dark:text-zinc-50 sm:inline">Read the design →</span>
+            A verification harness over Cognee
+            <span className="hidden rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 font-medium text-zinc-950 dark:text-zinc-50 sm:inline">See what it adds →</span>
           </a>
           <h1 className="max-w-[960px] text-5xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-7xl">
             Ask why.
@@ -274,7 +285,7 @@ export default function Home() {
           </h1>
           <p className="max-w-[640px] text-lg leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-[19px]">
             Permafrost connects your docs, tickets, meeting notes and org chart into one knowledge graph, then answers
-            questions with cited sources and the chain of links behind them.
+            questions with cited sources and the chain of links behind them. Cognee remembers. The harness checks.
           </p>
           <div className="flex flex-wrap justify-center gap-3 pt-1">
             <a
@@ -330,6 +341,48 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="harness" className="scroll-mt-16 border-t border-zinc-100 dark:border-zinc-800 px-4 py-28 sm:px-6">
+          <div className="mx-auto flex max-w-[1200px] flex-col gap-14">
+            <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end lg:gap-20">
+              <div className="flex max-w-[720px] flex-col gap-4">
+                <Eyebrow>THE HARNESS</Eyebrow>
+                <h2 className="text-4xl font-semibold leading-[1.1] tracking-[-0.04em] sm:text-5xl">
+                  Cognee remembers.
+                  <br />
+                  <span className="text-zinc-500 dark:text-zinc-400">The harness checks.</span>
+                </h2>
+              </div>
+              <p className="max-w-[440px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                A wrapper forwards calls. A harness treats the engine&apos;s output as untrusted and rejects it when a check
+                fails. Cognee handles extraction, storage and retrieval. Everything in the right-hand column is
+                Permafrost, and most of it is deterministic code.
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
+              <div className="hidden grid-cols-[1fr_1.6fr_150px] gap-6 border-b border-zinc-200 bg-zinc-50 px-7 py-3 font-mono text-[11px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 md:grid">
+                <span>Cognee alone</span>
+                <span>The harness adds</span>
+                <span className="text-right">Evidence</span>
+              </div>
+              {HARNESS.map((h) => (
+                <div key={h.adds} className="grid gap-x-6 gap-y-2 border-b border-zinc-100 px-7 py-6 last:border-b-0 dark:border-zinc-800 md:grid-cols-[1fr_1.6fr_150px] md:items-center">
+                  <span className="text-[15px] text-zinc-500 dark:text-zinc-400">{h.alone}</span>
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[17px] font-semibold tracking-tight">{h.adds}</span>
+                    <span className="text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">{h.how}</span>
+                  </span>
+                  <span className="w-fit whitespace-nowrap rounded-md bg-emerald-50 px-2.5 py-1 font-mono text-xs text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 md:justify-self-end">
+                    {h.proof}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+              Measured, not claimed: the same 10 questions and the same prompt, with and without the harness. The eval ships in the app, next to a raw-Cognee baseline.
+            </p>
           </div>
         </section>
 

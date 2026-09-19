@@ -14,6 +14,7 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 
 - **Ingest** four source types from `data/seed/`: ADRs and docs (Markdown), tickets (JSON), meeting notes (Markdown) and the org chart (`team.json`).
 - **Add company data from the UI**: the **Data** page takes uploads (several files at once), shows each file's contradiction check and the graph build, syncs the seed folder, and lists every ingested file.
+- **Any format.** Structured docs (ADR / meeting `.md` with frontmatter, ticket `.json`) get canonical IDs, verified paths, stale and contradiction checks. Everything else is *semantic-only* (searchable and cited as evidence, no metadata edges): `.txt`/`.csv`/plain notes as text, `.pdf` and office docs through Cognee's loaders, and **audio, video and images transcribed or described with our own model first** (Cognee Cloud's hosted model can't read media: sent raw, it stored its chat reply as the document). Transcripts also go through the contradiction check.
 - **Build** a hybrid graph. Metadata becomes canonical structural edges (verified in the graph after ingestion), and Cognee's LLM extraction adds entities, topics and reasoning from prose.
 - **Answer** questions through `POST /ask` using Cognee `GRAPH_COMPLETION` retrieval, and refuse when the answer isn't in company knowledge (never guess).
 - **Catch contradictions**: drop a new doc and within ~8 s it is checked against the active decisions on the same service (e.g. *MTG-0402 contradicts ADR-007*), naming the decision owner and who raised it.

@@ -11,7 +11,7 @@ from pathlib import Path
 from app import cognee_client, store
 from app.analysis import contradictions
 from app.config import COGNEE_DATASET, DATA_DIR
-from app.ingest import align, loaders, semantic, structural
+from app.ingest import align, loaders, media, semantic, structural
 from app.query import paths
 
 # Showcase path + stale link: ingestion fails if cognify drops any of these (P1 exit gate).
@@ -24,6 +24,7 @@ SHOWCASE = [
     ("TCK-142", "references", "ADR-007"),
 ]
 PARALLEL = 5
+MEDIA = {"audio", "video", "image"}
 
 
 async def _ingest_record(rec: dict, dataset: str, sem: asyncio.Semaphore) -> tuple:
@@ -36,10 +37,14 @@ async def _ingest_record(rec: dict, dataset: str, sem: asyncio.Semaphore) -> tup
         async def none():
             return None
 
+        if rec["type"] in MEDIA:  # Cognee Cloud can't read media: send our transcript / description
+            rec = rec | {"body": await media.text_for(rec)}
         t, text = structural.triples(rec), semantic.render(rec)
         triples_id, data_id = await asyncio.gather(
             cognee_client.add_structural(t, dataset, f"{rec['ref']}.triples.txt", structural.facts(rec)) if t else none(),
-            cognee_client.add_text(text, [rec["type"]], dataset, f"{rec['ref']}.txt") if text else none(),
+            cognee_client.add_text(text, [rec["type"]], dataset, f"{rec['ref']}.txt") if text
+            else cognee_client.add_file(Path(rec["file"]).read_bytes(), f"{rec['ref']}{rec['suffix']}", [rec["type"]], dataset)
+            if rec.get("file") else none(),
         )
         return rec["path"], rec["ref"], rec["type"], rec["hash"], data_id, triples_id
 
@@ -125,6 +130,8 @@ async def ingest_file(path: Path, dataset: str = COGNEE_DATASET) -> tuple[dict, 
     if not recs:
         raise ValueError(f"{path.name}: no frontmatter id / not a recognised ADR, meeting or ticket")
     store.init_db()
+    if recs[0]["type"] in MEDIA:  # transcribe first, so the contradiction check reads the words too
+        recs[0]["body"] = await media.text_for(recs[0])
     async with asyncio.TaskGroup() as tg:  # either failing cancels the other (gather wouldn't)
         prep = tg.create_task(_prepare(path, False, dataset))
         chk = tg.create_task(contradictions.check(recs[0], loaders.load(DATA_DIR)))

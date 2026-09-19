@@ -18,6 +18,51 @@ type Row =
   | { name: string; kind: "done"; res: IngestResult }
   | { name: string; kind: "error"; message: string };
 
+// Mirrors backend loaders.SUPPORTED_EXT: structured .md/.json plus what Cognee's loaders read.
+const ACCEPT = [
+  ".md",
+  ".markdown",
+  ".json",
+  ".txt",
+  ".csv",
+  ".log",
+  ".html",
+  ".htm",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".pdf",
+  ".docx",
+  ".doc",
+  ".pptx",
+  ".xlsx",
+  ".odt",
+  ".rtf",
+  ".epub",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+  ".tif",
+  ".tiff",
+  ".bmp",
+  ".heic",
+  ".mp3",
+  ".wav",
+  ".m4a",
+  ".ogg",
+  ".flac",
+  ".aac",
+  ".aiff",
+  ".mp4",
+  ".m4v",
+  ".mov",
+  ".webm",
+  ".mkv",
+  ".avi",
+].join(",");
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // The backend takes one ingest at a time: a live upload holds the lock while Cognee builds the graph.
@@ -135,7 +180,7 @@ export function IngestCard({
         >
           <input
             type="file"
-            accept=".md,.json"
+            accept={ACCEPT}
             multiple
             className="sr-only"
             disabled={busy}
@@ -151,8 +196,10 @@ export function IngestCard({
             {busy ? "Ingesting…" : "Drop files or click to upload"}
           </span>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            ADR or meeting (.md with frontmatter{" "}
-            <code className="font-mono">id</code>), ticket (.json)
+            Structured: ADR / meeting (.md with frontmatter{" "}
+            <code className="font-mono">id</code>), ticket (.json): verified
+            path + contradiction check. Also txt, pdf, docs, images, audio,
+            video: searchable and cited (semantic-only)
           </span>
         </label>
 

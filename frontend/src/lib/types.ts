@@ -1,6 +1,7 @@
 // POST /ask contract (docs/phases/phase-2-query-pipeline.md, extends architecture.md §4)
 
-export type SourceType = "adr" | "ticket" | "meeting" | "org";
+// structured sources, then semantic-only files (no metadata edges): see backend loaders.py
+export type SourceType = "adr" | "ticket" | "meeting" | "org" | "doc" | "image" | "audio" | "video";
 
 export interface Evidence {
   source: SourceType;

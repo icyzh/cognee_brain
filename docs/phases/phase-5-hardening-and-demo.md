@@ -59,6 +59,12 @@ Production standards, architecture, completeness (PS checklist), reliability (ev
 - [ ] **(owner)** Apply only **small**, low-risk mentor feedback (copy, UI emphasis, slide order)
 - [ ] **(owner)** Re-run eval + one rehearsal → freeze
 
+## Added after the rehearsal: Data page + all formats
+- [x] **Data page** (`/sources`): upload several files, per-file progress and contradiction result, graph-build status, "Sync seed folder" (batch, unchanged skipped). Browser-tested (headless Chromium): 2 files queued and ingested, no console errors
+- [x] **All formats, semantic-only**: `.txt` `.csv` notes → text; `.pdf` / office → Cognee's loaders; audio / video → OpenAI transcription, images → vision description (`app/ingest/media.py`, cached in hidden sidecars), then sent as text
+- [x] Live-tested with real files (txt, text PDF, TTS speech mp3, mp4 with speech, whiteboard png): all 5 answered correctly and cited the file; the mp4 transcript raised a contradiction alert (push to all merchants vs ADR-009, 0.93)
+- Finding: Cognee Cloud's hosted model isn't multimodal. Raw mp3/png were "ingested" as its chat reply ("please upload the audio file"), and `.mp4` was rejected (409: MIME type). PDF text extraction on Cloud works.
+
 ## Results (2026-09-19)
 | Check | Result |
 |---|---|

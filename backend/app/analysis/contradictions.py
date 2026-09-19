@@ -102,7 +102,8 @@ async def check(rec: dict, records: list[dict]) -> list[dict]:
     adrs = {r["ref"]: r["meta"] for r in records if r["type"] == "adr"}
     bodies = {r["ref"]: r["body"] for r in records if r["type"] == "adr"}
     services = {svc for m in adrs.values() for svc in structural._list(m.get("affects"))}
-    claims = extract_claims(rec, adrs) or await llm_claims(rec, services)
+    # no text of our own for images/audio/video (Cognee transcribes them server-side): no claims to judge
+    claims = extract_claims(rec, adrs) or (await llm_claims(rec, services) if rec["body"].strip() else [])
     pairs = [
         (c | {"context": rec["body"]}, d)
         for c in claims
