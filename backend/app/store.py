@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE TABLE IF NOT EXISTS eval_runs (
     id INTEGER PRIMARY KEY,
+    variant TEXT NOT NULL,  -- 'decision_brain' | 'raw_cognee' (baseline)
     grounded_ok INTEGER NOT NULL,
     total INTEGER NOT NULL,
     hallucinated_sources INTEGER NOT NULL,

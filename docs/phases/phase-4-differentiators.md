@@ -1,4 +1,4 @@
-# Phase 4: Differentiators (contradiction detection, live ingest, eval, agent access)
+# Phase 4: Differentiators (contradiction detection, live ingest, eval + baseline, agent access)
 
 > **Goal:** the moments judges remember: the brain **notices when company knowledge contradicts itself**, updates live, and **proves its reliability with a number**.
 > **Tracks:** Cognee, Backend, Frontend, Quality · **Est:** 2 h · **Depends on:** P2, P3 · **Unblocks:** P5
@@ -65,10 +65,12 @@ new doc ingested
   - **hallucinated sources** (evidence refs not in `sources`), which must be 0
   - **path end correct**
   → writes a summary + per-question rows to `eval_runs`
-- [ ] `GET /eval/latest` → `{run_at, grounded_ok: 9, total: 10, hallucinated_sources: 0, ref_recall: 0.93}`
+- [ ] **Baseline comparison** (`run_eval.py --baseline`): the same 10 questions through **raw Cognee** (`/search` GRAPH_COMPLETION, `includeReferences: true`, no guard / supersede / path layers), scored the same way; plus **stale flagged** (does the answer mark ADR-003 as superseded?) and **refused** (does it decline out-of-corpus questions?). Raw refs = `data_id`s mapped through `sources`. Stored as `eval_runs.variant = 'raw_cognee'` vs `'decision_brain'`
+  → answers "isn't this just a Cognee wrapper?" with numbers, not claims
+- [ ] `GET /eval/latest` → `{decision_brain: {run_at, grounded_ok: 9, total: 10, hallucinated_sources: 0, ref_recall: 0.93, stale_flagged: 1}, raw_cognee: {…same fields…}}`
 
 ### Frontend
-- [ ] `EvalBadge` on the Ask page: `Eval 9/10 grounded · 0 hallucinated sources`; click → per-question table
+- [ ] `EvalBadge` on the Ask page: `Eval 9/10 grounded · 0 hallucinated sources`; click → per-question table with a **raw Cognee vs Decision Brain** column pair
 
 ---
 
@@ -86,6 +88,7 @@ new doc ingested
 - Re-ask the showcase question → it now includes the `contradiction` warning
 - Ingesting a non-conflicting doc raises **no** alert (false-positive check)
 - `uv run python -m eval.run_eval` → ≥ 9/10, 0 hallucinated sources; the badge shows it
+- `uv run python -m eval.run_eval --baseline` → raw Cognee scores recorded; Decision Brain beats it on stale flagged and refusals (if it doesn't, that's a finding to fix, not hide)
 - An MCP client (e.g. Claude Code) calls `ask_company_brain` with the showcase question and gets the same answer, evidence and path as the UI
 
 ## Exit gate
@@ -94,5 +97,5 @@ Demo steps 3–5 of the [plan's demo script](../plan.md#7-demo-script-2-minutes-
 ## If behind (in order)
 0. Cut 4D (agent access) first; mention it on the scalability slide instead
 1. Skip the LLM claim extraction and use frontmatter `decisions/affects` only (the demo file has frontmatter)
-2. Eval: run the CLI only and put the number on a slide instead of the UI badge
+2. Eval: run the CLI only (both variants) and put the comparison table on a slide instead of the UI badge
 3. Live ingest: pre-ingest MTG-0402 and show the alert feed only (lose the "live" moment, keep contradiction)

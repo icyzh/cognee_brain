@@ -161,8 +161,8 @@ flowchart LR
 2. **(15 s)** Ask *"What's our Kafka strategy?"* → **refuses**: "not in company knowledge". Point out that it never guesses.
 3. **(40 s)** Go to Alerts and drop `MTG-0402.md` (a new meeting proposing DynamoDB for payments). Ingest runs → a **contradiction alert** appears: *"MTG-0402 contradicts active ADR-007 (Postgres for ACID). Raised by Arjun; owner Priya."*
 4. **(20 s)** Re-ask the first question → the answer now carries the contradiction warning.
-5. **(15 s)** Point to the eval badge (9/10 grounded, 0 hallucinated sources) and the architecture slide.
-6. **(15 s)** Buffer.
+5. **(20 s)** Open the eval badge → **raw Cognee vs Decision Brain** on the same 10 questions (grounded, stale flagged, refusals). This is the "not just a wrapper" answer. Then the architecture slide.
+6. **(10 s)** Buffer.
 
 ---
 
@@ -174,6 +174,6 @@ flowchart LR
 - [ ] Answers grounded in retrieved knowledge (evidence cards, refusal path)
 - [ ] ≥1 multi-hop relationship demonstrated (4-hop path rendered)
 - [ ] Differentiator: contradiction + stale detection live
-- [ ] Eval ≥ 9/10 and shown in the UI
+- [ ] Eval ≥ 9/10 and shown in the UI, next to the raw-Cognee baseline on the same questions
 - [ ] Agent access: MCP tool `ask_company_brain` wraps `/ask` (PS-2 Challenge: humans, agents, and applications)
 - [ ] README: one-command setup, architecture diagram, decision log
