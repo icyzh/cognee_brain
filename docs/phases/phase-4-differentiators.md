@@ -1,4 +1,4 @@
-# Phase 4: Differentiators (contradiction detection, live ingest, eval)
+# Phase 4: Differentiators (contradiction detection, live ingest, eval, agent access)
 
 > **Goal:** the moments judges remember: the brain **notices when company knowledge contradicts itself**, updates live, and **proves its reliability with a number**.
 > **Tracks:** Cognee, Backend, Frontend, Quality · **Est:** 2 h · **Depends on:** P2, P3 · **Unblocks:** P5
@@ -72,16 +72,27 @@ new doc ingested
 
 ---
 
+## 4D: Agent access (PS-2: "humans, agents, and applications")
+`/ask` is already the application API; this makes the same brain usable by an agent, with no new logic.
+
+- [ ] `backend/mcp_server.py`: `uv add mcp`, one `FastMCP` stdio server with one tool, `ask_company_brain(question) -> dict`, that POSTs to `http://localhost:8000/ask` and returns the response unchanged (answer, evidence, path, warnings)
+- [ ] `.mcp.json` at the repo root registering it (`uv run --directory backend python mcp_server.py`), so Claude Code / any MCP client picks it up
+- [ ] README: a 3-line "Use from an agent" section
+
+---
+
 ## Acceptance criteria
 - Drop `data/live/MTG-0402.md` in the UI → a red contradiction alert (vs ADR-007) appears in ≤ 30 s, with a correct one-line reason
 - Re-ask the showcase question → it now includes the `contradiction` warning
 - Ingesting a non-conflicting doc raises **no** alert (false-positive check)
 - `uv run python -m eval.run_eval` → ≥ 9/10, 0 hallucinated sources; the badge shows it
+- An MCP client (e.g. Claude Code) calls `ask_company_brain` with the showcase question and gets the same answer, evidence and path as the UI
 
 ## Exit gate
 Demo steps 3–5 of the [plan's demo script](../plan.md#7-demo-script-2-minutes-judging-round) work end to end.
 
 ## If behind (in order)
+0. Cut 4D (agent access) first; mention it on the scalability slide instead
 1. Skip the LLM claim extraction and use frontmatter `decisions/affects` only (the demo file has frontmatter)
 2. Eval: run the CLI only and put the number on a slide instead of the UI badge
 3. Live ingest: pre-ingest MTG-0402 and show the alert feed only (lose the "live" moment, keep contradiction)

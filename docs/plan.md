@@ -86,7 +86,7 @@ Modules: `query/ask.py` (retrieve → guard → supersede → path), `query/path
 | [P1](phases/phase-1-data-and-ingestion.md) | Seed data + ingestion | Data, Cognee, Backend | 2–2.5 h | `uv run python -m app.ingest` builds the graph; the showcase path exists in the graph |
 | [P2](phases/phase-2-query-pipeline.md) | Query pipeline `/ask` | Cognee, Backend | 2 h | The showcase question returns a grounded answer, evidence, the 4-hop path and a stale warning via curl |
 | [P3](phases/phase-3-frontend.md) | Frontend Ask experience | Frontend | 2 h | End-to-end demo in the browser |
-| [P4](phases/phase-4-differentiators.md) | Contradictions + live ingest + eval | All | 2 h | Dropping `MTG-0402.md` raises an alert in ≤ 30 s; eval badge shows ≥ 9/10 |
+| [P4](phases/phase-4-differentiators.md) | Contradictions + live ingest + eval + MCP agent tool | All | 2–2.5 h | Dropping `MTG-0402.md` raises an alert in ≤ 30 s; eval badge shows ≥ 9/10 |
 | [P5](phases/phase-5-hardening-and-demo.md) | Hardening, docs, pitch | Quality, All | 1.5 h | Demo rehearsed 3× clean; README and slides done |
 
 > Estimates are focused-work hours for a small team. **Backend and frontend can run in parallel from P2 onward** (frontend builds against the `/ask` contract with a mock JSON).
@@ -98,7 +98,7 @@ flowchart LR
     P0 --> P3a["P3 Frontend on mock JSON"]
     P2 --> P3b["P3 Frontend on live API"]
     P3a --> P3b
-    P2 --> P4["P4 Contradictions + live ingest + eval"]
+    P2 --> P4["P4 Contradictions + live ingest + eval + agent"]
     P3b --> P4
     P4 --> P5["P5 Hardening + demo"]
 ```
@@ -175,4 +175,5 @@ flowchart LR
 - [ ] ≥1 multi-hop relationship demonstrated (4-hop path rendered)
 - [ ] Differentiator: contradiction + stale detection live
 - [ ] Eval ≥ 9/10 and shown in the UI
+- [ ] Agent access: MCP tool `ask_company_brain` wraps `/ask` (PS-2 Challenge: humans, agents, and applications)
 - [ ] README: one-command setup, architecture diagram, decision log
