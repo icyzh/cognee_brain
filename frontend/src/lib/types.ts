@@ -32,6 +32,8 @@ export interface AskResponse {
   evidence: Evidence[];
   path: PathEdge[];
   warnings: Warning[];
+  experts?: { id: string; team: string | null; score: number }[]; // PageRank over verified edges, best first
+  unsupported_citations?: string[]; // IDs the answer cites that were not in the retrieved context
   latency_ms: number;
   qa_id: number;
 }
@@ -95,6 +97,7 @@ export interface EvalSummary {
 // GET /eval/latest; a variant is null until it has been run
 export interface EvalLatest {
   decision_brain: EvalSummary | null;
+  cognee_prompted?: EvalSummary | null; // ablation: our system prompt, none of our layers
   raw_cognee: EvalSummary | null;
 }
 
@@ -102,4 +105,29 @@ export interface EvalLatest {
 export interface GraphData {
   nodes: { id: string; type: string; label: string }[];
   edges: { from: string; to: string; rel: string }[];
+}
+
+// GET /timeline?service=&as_of= (backend/app/analysis/timeline.py)
+export interface TimelineEntry {
+  ref: string;
+  title: string;
+  status: "active" | "superseded" | "proposed";
+  valid_from: string;
+  valid_to: string | null;
+  in_force: boolean;
+  superseded_by?: string[];
+  contradicts?: string;
+}
+
+export interface TimelineData {
+  service: string;
+  as_of: string | null;
+  entries: TimelineEntry[];
+}
+
+// GET /history row: a stored /ask response, opened instantly from the Ask start screen
+export interface HistoryItem {
+  question: string;
+  asked_at: string;
+  response: AskResponse;
 }

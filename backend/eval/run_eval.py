@@ -1,8 +1,9 @@
-"""Eval: uv run python -m eval.run_eval [--baseline]
+"""Eval: uv run python -m eval.run_eval [--baseline [raw|prompted]]
 
 Default scores our /ask pipeline ("decision_brain"). --baseline scores raw Cognee on the same questions:
 GRAPH_COMPLETION with Cognee's default prompt, and no guard, evidence, path or supersede layers.
 Both are scored the same way on what the response *cites*: the IDs written in the answer text.
+--baseline prompted is the ablation row: Cognee + our system prompt, still none of our layers.
 "grounded" is our pipeline's own flag vs a refusal-wording regex for raw Cognee (it has no flag).
 """
 
@@ -10,7 +11,7 @@ import argparse
 import asyncio
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app import cognee_client, store
@@ -33,8 +34,8 @@ async def run_ours(q: dict) -> dict:
     }
 
 
-async def run_raw(q: dict) -> dict:
-    r = await cognee_client.ask(q["q"], system_prompt=None)
+async def run_raw(q: dict, system_prompt: str | None = None) -> dict:
+    r = await cognee_client.ask(q["q"], system_prompt=system_prompt)
     answer = r["answer"]
     cited = ask._ID.findall(answer)
     stale = q.get("expect_stale")
@@ -46,6 +47,14 @@ async def run_raw(q: dict) -> dict:
         "stale": [stale] if stale and stale in cited and STALE_WORDS.search(answer) else [],
         "answer": answer,
     }
+
+
+async def run_prompted(q: dict) -> dict:
+    """Ablation: Cognee + our system prompt, none of our layers. Separates what the prompt buys from what the code buys."""
+    return await run_raw(q, cognee_client.SYSTEM_PROMPT)
+
+
+VARIANTS = {"ours": (run_ours, "decision_brain"), "raw": (run_raw, "raw_cognee"), "prompted": (run_prompted, "cognee_prompted")}
 
 
 def score(q: dict, out: dict) -> dict:
@@ -77,10 +86,10 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
-async def main(baseline: bool) -> dict:
+async def main(variant: str = "ours") -> dict:
     store.init_db()
     await paths.refresh()  # no FastAPI lifespan here: without it `path` is [] and no stale warnings fire
-    run, variant = (run_raw, "raw_cognee") if baseline else (run_ours, "decision_brain")
+    run, variant = VARIANTS[variant]
     sem = asyncio.Semaphore(1)  # one at a time, like a user: Cloud slows sharply under concurrent searches (2 in flight → a 23 s timeout)
 
     async def one(q):
@@ -99,13 +108,14 @@ async def main(baseline: bool) -> dict:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(prog="python -m eval.run_eval")
-    ap.add_argument("--baseline", action="store_true", help="score raw Cognee instead of our pipeline")
-    res = asyncio.run(main(ap.parse_args().baseline))
+    ap.add_argument("--baseline", nargs="?", const="raw", choices=["raw", "prompted"],
+                    help="score a baseline instead of our pipeline: raw Cognee (default) or Cognee + our system prompt")
+    res = asyncio.run(main(ap.parse_args().baseline or "ours"))
     for r in res["rows"]:
         flags = ["grounded " + ("ok" if r["grounded_ok"] else "WRONG"), f"refs {r['ref_recall']}"]
         flags += [f"path {'ok' if r['path_ok'] else 'WRONG'}"] if r["path_ok"] is not None else []
         flags += [f"stale {'ok' if r['stale_ok'] else 'MISSED'}"] if r["stale_ok"] is not None else []
         flags += [f"hallucinated {r['hallucinated']}"] if r["hallucinated"] else []
         print(f"- {r['q']}\n    {' · '.join(flags)}")
-    print(f"\n{res['variant']} @ {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z: "
+    print(f"\n{res['variant']} @ {datetime.now(UTC):%Y-%m-%d %H:%M}Z: "
           + " · ".join(f"{k} {v}" for k, v in res.items() if k not in ("variant", "rows")))

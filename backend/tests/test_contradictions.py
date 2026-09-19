@@ -41,6 +41,20 @@ def test_threshold_and_cap():
     assert [a["existing_ref"] for a in alerts] == ["ADR-007"]  # 0.5 < THRESHOLD: no alert
 
 
+def test_unlabelled_doc_falls_back_to_llm_claims():
+    async def fake_llm(system, user):
+        assert "svc-payments" in user  # the model may only pick from known service ids
+        return {"claims": [{"service": "svc-payments", "summary": "Move payments to DynamoDB", "by": "arjun"},
+                           {"service": "svc-made-up", "summary": "ignored"}]}
+
+    contradictions._llm_json = fake_llm
+    bare = LIVE | {"meta": {k: v for k, v in LIVE["meta"].items() if k != "proposals"}}
+    assert contradictions.extract_claims(bare, ADRS) == []
+    services = {s for m in ADRS.values() for s in m["affects"]}
+    assert asyncio.run(contradictions.llm_claims(bare, services)) == [
+        {"service": "svc-payments", "text": "Move payments to DynamoDB", "source_ref": "MTG-0402", "by": "arjun"}]
+
+
 def test_stale_alert_rows():
     rows = []
     contradictions.store.replace_stale_alerts = rows.extend

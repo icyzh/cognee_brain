@@ -16,3 +16,11 @@ dependencies = [
     "uvicorn[standard]>=0.53.0",
 ]
 
+
+[tool.ruff]
+line-length = 130
+
+[tool.ruff.lint]
+# pyflakes + import order + bugbear + pyupgrade; B008 is FastAPI's File()/Query() default pattern
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+ignore = ["B008"]

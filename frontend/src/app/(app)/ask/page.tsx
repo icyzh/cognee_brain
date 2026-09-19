@@ -5,9 +5,9 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { AnswerPanel, AnswerSkeleton } from "@/components/AnswerPanel";
 import { AskBox } from "@/components/AskBox";
 import { EvalBadge } from "@/components/EvalBadge";
-import { Card, ErrorState, ICON, Icon, Stat } from "@/components/ui";
-import { alerts, ask, evalLatest, sources } from "@/lib/api";
-import type { Alert, AskResponse, EvalLatest, Source } from "@/lib/types";
+import { Card, ErrorState, ICON, Icon, Pill, Stat } from "@/components/ui";
+import { alerts, ask, evalLatest, history, sources } from "@/lib/api";
+import type { Alert, AskResponse, EvalLatest, HistoryItem, Source } from "@/lib/types";
 
 type State =
   | { kind: "idle" }
@@ -71,6 +71,10 @@ function Ask() {
   const [state, setState] = useState<State>({ kind: initial ? "loading" : "idle" });
   const last = useRef(initial);
   const overview = useOverview();
+  const [recent, setRecent] = useState<HistoryItem[]>([]);
+  useEffect(() => {
+    history().then(setRecent, () => {});
+  }, []);
 
   function run(question: string) {
     last.current = question;
@@ -99,7 +103,28 @@ function Ask() {
     <>
       <Overview {...overview} />
       <AskBox key={initial} initial={initial} busy={state.kind === "loading"} onAsk={run} />
-      {state.kind === "idle" && (
+      {state.kind === "idle" && recent.length > 0 && (
+        <Card title="Recent answers" action={<Pill>stored · opens instantly</Pill>} bodyClassName="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
+          {recent.map((h) => (
+            <button
+              key={h.question}
+              type="button"
+              onClick={() => setState({ kind: "done", res: h.response })}
+              className="flex flex-col gap-1 px-5 py-3 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+            >
+              <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                {h.question}
+                {h.response.path.length > 0 && <Pill tone="green">{h.response.path.length} hops</Pill>}
+                {h.response.warnings.map((w) => (
+                  <Pill key={`${w.kind}-${w.node}`} tone={w.kind === "stale" ? "amber" : "red"}>{w.kind} · {w.node}</Pill>
+                ))}
+              </span>
+              <span className="line-clamp-2 text-[13px] text-zinc-500 dark:text-zinc-400">{h.response.answer}</span>
+            </button>
+          ))}
+        </Card>
+      )}
+      {state.kind === "idle" && recent.length === 0 && (
         <Card bodyClassName="flex flex-col items-center gap-3 px-6 py-14 text-center">
           <span className="flex size-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
             <Icon d={ICON.graph} className="size-5" />

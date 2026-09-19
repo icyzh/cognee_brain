@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import sqlite3
+import time
+import uuid
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
@@ -8,15 +10,17 @@ from typing import Annotated
 
 import httpx
 import yaml
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field, StringConstraints
 
 from app import cognee_client, store
+from app.analysis import timeline as decision_timeline
 from app.config import COGNEE_DATASET, COGNEE_SERVICE_URL, DATA_DIR
 from app.ingest import __main__ as ingest
 from app.ingest import align, loaders, structural
+from app.logs import jlog, request_id
 from app.query import ask as ask_pipeline
 from app.query import paths
 
@@ -45,14 +49,36 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def request_log(request: Request, call_next):
+    """One JSON line per request (id, endpoint, status, latency); /ask adds grounded + tokens itself."""
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    request_id.set(rid)
+    t0 = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:  # anything unhandled: log it, never send a stack trace to the client
+        logging.exception("unhandled error rid=%s", rid)
+        response = JSONResponse({"detail": {"error": "internal error", "retryable": False, "request_id": rid}}, 500)
+    response.headers["x-request-id"] = rid
+    jlog("request", method=request.method, path=request.url.path, status=response.status_code,
+         latency_ms=round((time.perf_counter() - t0) * 1000))
+    return response
+
+
 @app.get("/health")
 def health():
+    """Pre-demo check: Cognee configured, graph loaded (path cache), last eval score."""
+    ev = store.latest_eval("decision_brain")
     return {
         "status": "ok",
         "cognee_version": version("cognee"),
         "cognee_configured": bool(COGNEE_SERVICE_URL),
         "dataset": COGNEE_DATASET,
         "llm_model": "tenant-managed",
+        "graph": {"nodes": paths._cache.get("nodes"), "verified_edges": sum(map(len, paths._cache.get("adj", {}).values())) // 2},
+        "last_eval": ev and {"grounded": f"{ev['grounded_ok']}/{ev['total']}", "path": f"{ev.get('path_ok')}/{ev.get('path_total')}", "run_at": ev["run_at"]},
+        "ingest_building": _ingest_lock.locked(),
     }
 
 
@@ -134,7 +160,7 @@ async def _finish_in_background(finish) -> None:
 @app.get("/eval/latest")
 def eval_latest():
     """Latest eval run per variant: ours vs the raw-Cognee baseline (uv run python -m eval.run_eval [--baseline])."""
-    return {"decision_brain": store.latest_eval("decision_brain"), "raw_cognee": store.latest_eval("raw_cognee")}
+    return {v: store.latest_eval(v) for v in ("decision_brain", "cognee_prompted", "raw_cognee")}
 
 
 @app.get("/ingest/status")
@@ -154,6 +180,17 @@ def alerts():
     return out
 
 
+@app.get("/timeline")
+def timeline(service: str, as_of: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$")):
+    """Decision history of one service (ID or alias: "svc-payments", "payments"): validity intervals,
+    which decisions were in force on `as_of` (default today), and open contradiction proposals."""
+    cid = align.canonical_id(service, store.get_aliases()) or ""
+    if not cid.startswith("Service:"):
+        raise HTTPException(404, f"unknown service {service!r}")
+    svc = cid.split(":", 1)[1]
+    return {"service": svc, "as_of": as_of, "entries": decision_timeline.for_service(svc, loaders.load(DATA_DIR), store.list_alerts(), as_of)}
+
+
 class AskRequest(BaseModel):
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
 
@@ -166,17 +203,33 @@ class FeedbackRequest(BaseModel):
 
 @app.post("/ask")
 async def ask(req: AskRequest, raw: bool = False):
-    """raw=true: plain Cognee on the same question, for the side-by-side demo."""
+    """raw=true: plain Cognee on the same question, for the side-by-side demo.
+
+    Cached fallback (P5): if this question was answered before, the live call gets 20 s; on a timeout or
+    Cognee error the last answer is served, flagged `cached: true` (and logged), never hidden.
+    """
+    fallback = None if raw else ask_pipeline.cached(req.question)
     try:
-        return await (ask_pipeline.ask_raw if raw else ask_pipeline.ask)(req.question)
-    except httpx.TimeoutException:
-        raise HTTPException(504, {"error": "knowledge layer timed out", "retryable": True})
-    except httpx.HTTPError as e:  # connect / transport errors
-        logging.warning("ask transport error: %r", e)
-        raise HTTPException(502, {"error": "knowledge layer unreachable", "retryable": True}) from e
-    except RuntimeError as e:  # Cognee HTTP errors, raised by cognee_client
-        logging.exception("ask failed")
+        if raw:
+            return await ask_pipeline.ask_raw(req.question)
+        return await asyncio.wait_for(ask_pipeline.ask(req.question), 20 if fallback else None)
+    except (TimeoutError, httpx.HTTPError, RuntimeError) as e:
+        if fallback:
+            jlog("ask_fallback", reason=repr(e), qa_id=fallback.get("qa_id"))
+            return fallback
+        if isinstance(e, (TimeoutError, httpx.TimeoutException)):
+            raise HTTPException(504, {"error": "knowledge layer timed out", "retryable": True}) from e
+        if isinstance(e, httpx.HTTPError):  # connect / transport errors
+            logging.warning("ask transport error: %r", e)
+            raise HTTPException(502, {"error": "knowledge layer unreachable", "retryable": True}) from e
+        logging.exception("ask failed")  # Cognee HTTP errors, raised by cognee_client as RuntimeError
         raise HTTPException(502, {"error": "knowledge layer error", "retryable": True}) from e
+
+
+@app.get("/history")
+def history(limit: int = Query(6, ge=1, le=20)):
+    """Recent grounded answers, one per question: shown on the Ask page before anything is asked."""
+    return store.recent_answers(limit)
 
 
 @app.post("/feedback")
@@ -184,7 +237,7 @@ def feedback(req: FeedbackRequest):
     try:
         store.add_feedback(req.qa_id, req.helpful, req.comment)
     except sqlite3.IntegrityError:  # foreign key: unknown qa_id
-        raise HTTPException(404, "unknown qa_id")
+        raise HTTPException(404, "unknown qa_id") from None
     return {"ok": True}
 
 

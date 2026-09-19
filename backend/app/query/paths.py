@@ -86,6 +86,28 @@ def shortest(a: str, b: str, max_hops: int = 4) -> list[tuple[str, str, str]] | 
     return None
 
 
+def rank_people(seeds: list[str], k: int = 3, alpha: float = 0.3, iters: int = 30) -> list[dict]:
+    """Who to ask: Personalized PageRank over the verified edges, restarting at the entities the question and
+    answer mention (HippoRAG, arXiv 2405.14831). Ranks by graph evidence (decisions owned, meetings attended,
+    tickets assigned), not by who the LLM happened to name first. Hub-ish edges keep their path WEIGHT penalty."""
+    adj = _cache.get("adj", {})
+    seeds = [s for s in dict.fromkeys(seeds) if s in adj]
+    if not seeds:
+        return []
+    score = restart = {s: 1 / len(seeds) for s in seeds}
+    for _ in range(iters):
+        nxt = {s: alpha * r for s, r in restart.items()}
+        for node, mass in score.items():
+            out = [(n, 1 / WEIGHT.get(base, 1.0)) for n, _, base in adj[node]]
+            total = sum(w for _, w in out)
+            for n, w in out:
+                nxt[n] = nxt.get(n, 0.0) + (1 - alpha) * mass * w / total
+        score = nxt
+    people = sorted(((v, n) for n, v in score.items() if n.startswith("Person:")), key=lambda x: (-x[0], x[1]))[:k]
+    team = lambda p: next((n.split(":", 1)[1] for n, rel, _ in adj[p] if rel == "member_of"), None)  # noqa: E731
+    return [{"id": p.split(":", 1)[1], "team": team(p), "score": round(v, 3)} for v, p in people]
+
+
 def best_path(question_ids: list[str], answer_ids: list[str]) -> list[tuple[str, str, str]]:
     """Anchor (first Service/Decision/Ticket in the question) → cited *active* decision → person → team.
 

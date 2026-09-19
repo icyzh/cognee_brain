@@ -1,16 +1,16 @@
 """uv run python -m app.ingest [--reset] [path]  |  uv run python -m app.ingest --forget PATH"""
 
 import argparse
-import logging
 import asyncio
+import logging
 import time
-from collections.abc import Coroutine
 from collections import Counter
+from collections.abc import Coroutine
 from pathlib import Path
 
 from app import cognee_client, store
-from app.config import COGNEE_DATASET, DATA_DIR
 from app.analysis import contradictions
+from app.config import COGNEE_DATASET, DATA_DIR
 from app.ingest import align, loaders, semantic, structural
 from app.query import paths
 

@@ -65,6 +65,7 @@ export function EvalBadge({ data }: { data: EvalLatest | null }) {
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
             <Summary name="Permafrost" s={pf} />
+            {data.cognee_prompted && <Summary name="Cognee + our prompt (no layers)" s={data.cognee_prompted} />}
             <Summary name="Raw Cognee" s={raw} />
           </tbody>
         </table>

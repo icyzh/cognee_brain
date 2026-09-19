@@ -2,12 +2,14 @@ import type { AskResponse } from "@/lib/types";
 import { EvidenceCard } from "./EvidenceCard";
 import { FeedbackBar } from "./FeedbackBar";
 import { HopPath } from "./HopPath";
+import { Timeline } from "./Timeline";
 import { Card, ICON, Icon, Pill } from "./ui";
 import { WarningBanner } from "./WarningBanner";
 
 const seconds = (ms: number) => <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">{(ms / 1000).toFixed(1)} s</span>;
 
 export function AnswerPanel({ res }: { res: AskResponse }) {
+  const service = res.path.flatMap((e) => [e.from, e.to]).find((n) => n.type === "Service")?.id;
   if (!res.grounded) {
     return (
       <Card
@@ -68,10 +70,24 @@ export function AnswerPanel({ res }: { res: AskResponse }) {
             </div>
           </Card>
         )}
+        {service && <Timeline key={service} service={service} />}
       </div>
       {res.path.length > 0 && (
         <Card title="Reasoning path" action={<Pill>{res.path.length} {res.path.length === 1 ? "hop" : "hops"}</Pill>}>
           <HopPath path={res.path} />
+          {!!res.experts?.length && (
+            <div className="mt-4 border-t border-zinc-100 pt-3 text-[13px] dark:border-zinc-800">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">People to ask · ranked by graph evidence</p>
+              <ol className="flex flex-col gap-1 font-mono">
+                {res.experts.map((p, i) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3">
+                    <span>{i + 1}. {p.id}{p.team && <span className="text-zinc-500 dark:text-zinc-400"> · {p.team}</span>}</span>
+                    <span className="h-1.5 rounded-full bg-emerald-500/70" style={{ width: `${Math.round((p.score / res.experts![0].score) * 64)}px` }} />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </Card>
       )}
     </div>

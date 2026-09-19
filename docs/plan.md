@@ -174,12 +174,12 @@ Measured: `/ask` 10–16 s, alert ~8 s. Ask one question at a time (Cognee Cloud
 
 ## 8. Definition of done (PS-2 completeness)
 
-- [ ] Cognee-powered knowledge layer (`cognee_client.py`, graph in the Cognee Cloud dataset)
-- [ ] ≥2 types of company information (ADRs, tickets, meetings, org chart = 4)
-- [ ] Natural-language Q&A interface (`/` Ask page)
-- [ ] Answers grounded in retrieved knowledge (evidence cards, refusal path)
-- [ ] ≥1 multi-hop relationship demonstrated (4-hop path rendered)
-- [ ] Differentiator: contradiction + stale detection live
-- [ ] Eval ≥ 9/10 and shown in the UI, next to the raw-Cognee baseline on the same questions
-- [ ] Agent access: MCP tool `ask_company_brain` wraps `/ask` (PS-2 Challenge: humans, agents, and applications)
-- [ ] README: one-command setup, architecture diagram, decision log
+- [x] Cognee-powered knowledge layer (`cognee_client.py`, graph in the Cognee Cloud dataset `snow`: 453 nodes, 125/125 structural edges verified)
+- [x] ≥2 types of company information (ADRs, tickets, meetings, org chart = 4)
+- [x] Natural-language Q&A interface (`/ask` page, `POST /ask`)
+- [x] Answers grounded in retrieved knowledge (evidence cards, refusal path; eval: 0 hallucinated sources)
+- [x] ≥1 multi-hop relationship demonstrated (4-hop path `svc-payments → ADR-007 → MTG-0312 → priya → platform`, 8/8 identical runs)
+- [x] Differentiator: contradiction + stale detection live (MTG-0402 → alert vs ADR-007 in ~8 s)
+- [x] Eval ≥ 9/10 and shown in the UI, next to the raw-Cognee baseline on the same questions (10/10 vs 9/10; path 5/5 vs 0/5)
+- [x] Agent access: MCP tool `ask_company_brain` wraps `/ask` (PS-2 Challenge: humans, agents, and applications)
+- [x] README: one-command setup (`scripts/init.sh`, `scripts/dev.sh`), architecture diagram, decision log

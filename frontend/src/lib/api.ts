@@ -8,8 +8,9 @@ import {
   mockIngest,
   mockRefusal,
   mockSources,
+  mockTimeline,
 } from "./mock";
-import type { Alert, AskResponse, EvalLatest, GraphData, IngestResult, Source } from "./types";
+import type { Alert, AskResponse, EvalLatest, GraphData, HistoryItem, IngestResult, Source, TimelineData } from "./types";
 
 export const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -91,4 +92,14 @@ export async function graph(focus?: string, depth = 2): Promise<GraphData> {
   if (USE_MOCK) return mockGraph;
   const qs = focus ? `?${new URLSearchParams({ focus, depth: String(depth) })}` : "";
   return request(`/graph${qs}`);
+}
+
+export async function timeline(service: string, asOf?: string): Promise<TimelineData> {
+  if (USE_MOCK) return mockTimeline(service, asOf);
+  return request(`/timeline?${new URLSearchParams({ service, ...(asOf ? { as_of: asOf } : {}) })}`);
+}
+
+export async function history(): Promise<HistoryItem[]> {
+  if (USE_MOCK) return [{ question: SHOWCASE_QUESTION, asked_at: "", response: mockAsk }];
+  return request("/history");
 }

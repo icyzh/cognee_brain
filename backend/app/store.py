@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE TABLE IF NOT EXISTS eval_runs (
     id INTEGER PRIMARY KEY,
-    variant TEXT NOT NULL,  -- 'decision_brain' | 'raw_cognee' (baseline)
+    variant TEXT NOT NULL,  -- 'decision_brain' | 'cognee_prompted' | 'raw_cognee' (baselines)
     grounded_ok INTEGER NOT NULL,
     total INTEGER NOT NULL,
     hallucinated_sources INTEGER NOT NULL,
@@ -158,12 +158,15 @@ def clear_contradictions(new_ref: str) -> None:
         conn.execute("DELETE FROM alerts WHERE kind = 'contradiction' AND new_ref = ?", (new_ref,))
 
 
-def contradictions_for(refs: list[str]) -> list[dict]:
-    if not refs:
+def contradictions_for(refs: list[str], services: list[str] = ()) -> list[dict]:
+    """Open contradiction alerts on any of these decisions, or on any of these services."""
+    if not refs and not services:
         return []
+    ph = lambda xs: ",".join("?" * len(xs)) or "NULL"  # noqa: E731
     with closing(connect()) as conn:
-        q = f"SELECT * FROM alerts WHERE kind = 'contradiction' AND existing_ref IN ({','.join('?' * len(refs))}) ORDER BY id"
-        return [dict(r) for r in conn.execute(q, refs)]
+        q = (f"SELECT * FROM alerts WHERE kind = 'contradiction' "
+             f"AND (existing_ref IN ({ph(refs)}) OR service IN ({ph(services)})) ORDER BY id")
+        return [dict(r) for r in conn.execute(q, [*refs, *services])]
 
 
 def delete_source(path: str) -> None:
@@ -189,3 +192,23 @@ def latest_eval(variant: str) -> dict | None:
     extra = json.loads(r["results_json"] or "{}")
     return {"run_at": r["created_at"], "grounded_ok": r["grounded_ok"], "total": r["total"],
             "hallucinated_sources": r["hallucinated_sources"], "ref_recall": r["ref_recall"], **extra}
+
+
+def recent_answers(limit: int = 6) -> list[dict]:
+    """Latest grounded /ask response per distinct question, newest first (the Ask page's start screen)."""
+    with closing(connect()) as conn:
+        rows = conn.execute(
+            """SELECT question, response_json, created_at FROM qa_log
+               WHERE id IN (SELECT MAX(id) FROM qa_log WHERE grounded = 1 GROUP BY lower(trim(question)))
+               ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
+    return [{"question": r["question"], "asked_at": r["created_at"], "response": json.loads(r["response_json"])} for r in rows]
+
+
+def last_answer(question: str) -> dict | None:
+    """Most recent completed /ask response for this question (the cached fallback, P5)."""
+    with closing(connect()) as conn:
+        r = conn.execute(
+            "SELECT id, response_json FROM qa_log WHERE lower(trim(question)) = lower(trim(?)) ORDER BY id DESC LIMIT 1",
+            (question,),
+        ).fetchone()
+    return json.loads(r["response_json"]) | {"qa_id": r["id"]} if r else None  # qa_id is assigned after the JSON is stored

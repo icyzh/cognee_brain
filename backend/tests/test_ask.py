@@ -57,6 +57,20 @@ def test_grounding_guard_refuses():
     assert ask.grounding_guard({"answer": "The Data team owns reports.", **ctx})  # no IDs cited: allowed
 
 
+def test_unsupported_citations_must_be_retrieved_not_just_real():
+    raw = {"answer": "Per ADR-007 (MTG-0312), see also ADR-001.", "triplets": [("adr-007", "decided_in", "mtg-0312")],
+           "chunks": [{"text": "x", "source_ref": "ADR-007.triples"}]}
+    assert ask.unsupported_citations(raw) == ["ADR-001"]  # a real ADR, but never retrieved for this answer
+
+
+def test_rank_people_uses_graph_evidence():
+    use_metadata_graph()
+    top = paths.rank_people(["Service:svc-payments", "Decision:ADR-007"])
+    assert (top[0]["id"], top[0]["team"]) == ("priya", "platform")  # owns ADR-007, attended MTG-0312, assigned TCK-142
+    assert paths.rank_people(["Ticket:TCK-118"])[0]["id"] == "diego"
+    assert paths.rank_people(["Service:unknown"]) == []
+
+
 def test_path_skips_superseded_decision():
     use_metadata_graph()
     q = paths.mentions("Why is payments on Postgres, and who should I talk to about it now?")

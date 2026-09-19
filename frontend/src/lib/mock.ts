@@ -1,4 +1,4 @@
-import type { Alert, AskResponse, EvalLatest, GraphData, IngestResult, Source } from "./types";
+import type { Alert, AskResponse, EvalLatest, GraphData, IngestResult, Source, TimelineData } from "./types";
 
 export const SHOWCASE_QUESTION = "Why is payments on Postgres, and who should I talk to about it now?";
 
@@ -312,4 +312,18 @@ export const mockGraph: GraphData = {
     { from: "platform", to: "svc-notify", rel: "owns" },
     { from: "mei", to: "platform", rel: "member_of" },
   ],
+};
+
+export const mockTimeline = (service: string, asOf?: string): TimelineData => {
+  const day = asOf ?? new Date().toISOString().slice(0, 10);
+  const mongo = day >= "2025-10-02" && day < "2026-03-12";
+  return {
+    service,
+    as_of: asOf ?? null,
+    entries: [
+      { ref: "ADR-003", title: "Use MongoDB for the payments ledger", status: "superseded", valid_from: "2025-10-02", valid_to: "2026-03-12", superseded_by: ["ADR-007"], in_force: mongo },
+      { ref: "ADR-007", title: "Use Postgres for the payments ledger", status: "active", valid_from: "2026-03-12", valid_to: null, superseded_by: [], in_force: day >= "2026-03-12" },
+      { ref: "MTG-0402", title: "Moving payments storage to DynamoDB reverses the Postgres decision", status: "proposed", valid_from: "2026-04-02", valid_to: null, contradicts: "ADR-007", in_force: false },
+    ],
+  };
 };

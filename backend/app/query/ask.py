@@ -6,6 +6,7 @@ import time
 
 from app import cognee_client, store
 from app.ingest import structural
+from app.logs import jlog
 from app.query import paths
 
 REFUSAL = "I couldn't find this in company knowledge."
@@ -25,6 +26,13 @@ def grounding_guard(raw: cognee_client.RawResult) -> bool:
         return False
     cited = set(_ID.findall(answer))
     return not cited or any(store.get_source_by_ref(i) for i in cited)
+
+
+def unsupported_citations(raw: cognee_client.RawResult) -> list[str]:
+    """IDs the answer cites that appear nowhere in the retrieved context (chunk files, chunk text, triplets).
+    Deterministic citation-precision check: existing in the corpus is not enough, it must have been retrieved."""
+    context = " ".join([f"{c['source_ref']} {c['text']}" for c in raw["chunks"]] + [f"{s} {o}" for s, _, o in raw["triplets"]]).upper()  # cognify lowercases entity names
+    return [i for i in dict.fromkeys(_ID.findall(raw["answer"])) if i not in context]
 
 
 def snippet(text: str, terms: set[str], limit: int = 160) -> str:
@@ -114,16 +122,38 @@ async def ask(question: str) -> dict:
         adrs = paths._cache.get("adrs", {})
         warnings = supersede_check(decisions, adrs) + [
             {"kind": "contradiction", "node": c["existing_ref"], "message": f"{c['new_ref']} contradicts {c['existing_ref']}: {c['reason']}"}
-            for c in store.contradictions_for(decisions)
+            # services too: the answer's wording varies run to run and may not cite the decision (rehearsal run 3)
+            for c in store.contradictions_for(decisions, [i.split(":", 1)[1] for i in q_ids + a_ids if i.startswith("Service:")])
         ]
         answer = _HEADER_REF.sub(r"\1", raw["answer"])
         cited = {i.split(":", 1)[1] for i in a_ids if i.startswith("Decision:")}
         for w in warnings:  # the answer cites a stale decision as if current, without its successor
             if w["node"] in cited and not cited & set(structural._list(adrs.get(w["node"], {}).get("superseded_by"))):
                 answer += f" Note: {w['message']}."
-        resp.update(answer=answer, grounded=True, evidence=ev, path=[_hop(h) for h in path], warnings=warnings)
+        resp.update(answer=answer, grounded=True, evidence=ev, path=[_hop(h) for h in path], warnings=warnings,
+                    unsupported_citations=unsupported_citations(raw), experts=paths.rank_people(q_ids + a_ids))
 
     resp["latency_ms"] = round((time.perf_counter() - t0) * 1000)
     tokens_est = (len(question) + len(raw["answer"]) + sum(len(c["text"]) for c in raw["chunks"])) // 4
     resp["qa_id"] = store.log_qa(question, resp["answer"], json.dumps(resp), resp["grounded"], tokens_est, resp["latency_ms"])
+    jlog("ask", grounded=resp["grounded"], latency_ms=resp["latency_ms"], tokens_est=tokens_est, qa_id=resp["qa_id"], hops=len(resp["path"]))
     return resp
+
+
+def cached(question: str) -> dict | None:
+    """The last answer to this exact question, with contradiction warnings recomputed (an alert raised
+    after it was cached, e.g. the live MTG-0402 upload, still shows). Flagged `cached: true`."""
+    resp = store.last_answer(question)
+    if not resp:
+        return None
+    decisions = list(dict.fromkeys(
+        [x["id"] for h in resp["path"] for x in (h["from"], h["to"]) if x["type"] == "Decision"]
+        + [e["ref"] for e in resp["evidence"] if e["source"] == "adr"]
+    ))
+    services = [x["id"] for h in resp["path"] for x in (h["from"], h["to"]) if x["type"] == "Service"]
+    services += [i.split(":", 1)[1] for i in paths.mentions(question) if i.startswith("Service:")]
+    resp["warnings"] = [w for w in resp["warnings"] if w["kind"] != "contradiction"] + [
+        {"kind": "contradiction", "node": c["existing_ref"], "message": f"{c['new_ref']} contradicts {c['existing_ref']}: {c['reason']}"}
+        for c in store.contradictions_for(decisions, services)
+    ]
+    return resp | {"cached": True}
