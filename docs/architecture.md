@@ -2,6 +2,8 @@
 
 A mini Company Brain on **Cognee**. It ingests docs, tickets and meeting notes into a hybrid graph+vector knowledge layer and answers natural-language questions with **evidence** and a **visible multi-hop path**.
 
+> **Full diagram:** [`architecture.excalidraw`](architecture.excalidraw) (open at excalidraw.com), with a PNG preview at [`architecture.png`](architecture.png).
+>
 > **Excalidraw:** every diagram below is a Mermaid `flowchart` or `sequenceDiagram`, the two types Excalidraw's converter supports. In Excalidraw, open **More tools → Mermaid to Excalidraw** and paste a block.
 > Items marked ⚠️ are Cognee APIs to confirm against the pinned version before building on them.
 
