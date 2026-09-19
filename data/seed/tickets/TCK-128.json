@@ -1,0 +1,10 @@
+{
+  "id": "TCK-128",
+  "title": "Office wifi keeps dropping in meeting room 3",
+  "body": "Wifi in meeting room 3 disconnects every few minutes, video calls keep freezing. Other rooms seem fine.",
+  "assignee": "lena",
+  "service": null,
+  "refs": [],
+  "status": "open",
+  "created": "2026-03-03"
+}

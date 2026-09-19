@@ -50,7 +50,7 @@ question
 
 ### Tasks
 - [ ] `grounding_guard`: refuse when there are no chunks and no triplets, **or** none of the cited refs exist in `sources`. Never let the LLM answer on empty context.
-- [ ] `paths.py`: `best_path(ids)`, a BFS over structural edges (from `graph()` or a cached adjacency built at startup) between the question's anchor entity and the answer's person or team; max 4 hops; returns ordered edges. Match on canonical `Type:id` node names (graph ids are UUIDs, and edge labels are LLM-chosen)
+- [ ] `paths.py`: `best_path(ids)`, a BFS over structural edges (`align.canonical_edges(graph_dump(), aliases)` gives canonical `(Type:id, rel, Type:id)` edges; cache at startup) between the question's anchor entity and the answer's person or team; max 4 hops; returns ordered edges. Match on canonical `Type:id` node names (graph ids are UUIDs, and edge labels are LLM-chosen)
   - Anchor = the first canonical Service/Decision mentioned; target = the Person/Team in the answer
   - Cache the adjacency in memory; rebuild after `/ingest`
 - [ ] `supersede_check`: for every Decision in the path or evidence, look up `supersedes` in the loader metadata (ADR frontmatter), not the LLM-built graph, and emit a `stale` warning. This is **code, not prompt**, so it is always correct.
@@ -66,12 +66,17 @@ question
 
 ---
 
+### Carried over from the P1 audit
+- [ ] Evidence lookup: `store.get_source_by_data_id(id)` matching `data_id OR triples_data_id` (chunks from triples docs carry the latter), or drop triples chunks from evidence
+- [ ] `best_path` reverses edges where the contract says so: the graph has `ADR-007 affects svc-payments`, the contract shows `svc-payments affected_by ADR-007`. Pin with a test
+- [ ] `supersede_check` reads `supersedes` from `loaders.load()` frontmatter (cache at startup); app.db doesn't store frontmatter
+
 ## Acceptance criteria
 ```bash
-curl -s localhost:8000/ask -d '{"question":"Why is payments on Postgres, and who should I talk to now?"}' -H 'content-type: application/json' | jq
+curl -s localhost:8000/ask -d '{"question":"Why is payments on Postgres, and who should I talk to about it now?"}' -H 'content-type: application/json' | jq
 ```
 - `grounded: true`, ≥2 evidence items from different source types, `path` = 4 hops ending at `platform`, `warnings` includes ADR-003
-- `"What's our Kafka strategy?"` → `grounded: false`, refusal text
+- `"What's our mobile release cadence?"` → `grounded: false`, refusal text
 - Same showcase query 5× → identical `path` (it is deterministic)
 
 ## Exit gate

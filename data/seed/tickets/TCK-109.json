@@ -1,0 +1,12 @@
+{
+  "id": "TCK-109",
+  "title": "Publish payment events to SQS",
+  "body": "svc-payments publishes authorised, captured and refunded events to SQS after commit, replacing the synchronous call to svc-notify (ADR-002).",
+  "assignee": "mei",
+  "service": "svc-payments",
+  "refs": [
+    "ADR-002"
+  ],
+  "status": "done",
+  "created": "2026-02-02"
+}

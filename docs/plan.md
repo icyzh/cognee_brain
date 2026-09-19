@@ -28,21 +28,21 @@
 Each track owns a part of the repo. Phases (§3) cut across tracks.
 
 ### 2.1 Data track: `data/seed/`
-A fictional company, **Acme Pay**, with **canonical IDs shared across every source**. This track makes or breaks the multi-hop story.
+A fictional company, **Snow Pay**, with **canonical IDs shared across every source**. This track makes or breaks the multi-hop story.
 
 | Item | Count | Notes |
 |---|---|---|
 | People (`team.json`) | ~8 | id, name, aliases (`Priya`, `P. Sharma`), team |
 | Teams | 3 | platform, payments-product, data |
 | Services | 5 | svc-payments, svc-ledger, svc-auth, svc-notify, svc-reports |
-| ADRs (`adrs/*.md`) | 8 | YAML frontmatter; **2 superseded** (ADR-003 → ADR-007, ADR-005 → ADR-009) |
+| ADRs (`adrs/*.md`) | 9 | YAML frontmatter; **2 superseded** (ADR-003 → ADR-007, ADR-005 → ADR-009) |
 | Tickets (`tickets/*.json`) | ~15 | assignee, service, refs to ADRs |
 | Meetings (`meetings/*.md`) | ~8 | attendees, decisions, transcript-style lines |
 | **Live-demo file** (`live/MTG-0402.md`) | 1 | **Not pre-ingested.** It proposes DynamoDB for payments, which contradicts active ADR-007. |
 
 ### 2.2 Cognee track: `backend/app/cognee_client.py` + `backend/app/ingest/`
 - The **only** module that talks to Cognee: a thin httpx client for Cognee Cloud REST (`/api/v1`), so API drift stays in one file.
-- Structural ingest: metadata rendered as canonical text triples (`Decision:ADR-007 affects Service:svc-payments.`) via `/add` with `node_set=structural`, then verified in `/graph` after cognify (Cognee Cloud has no custom DataPoints; spike S3).
+- Structural ingest: metadata rendered as text triples with raw IDs (`ADR-007 affects svc-payments.`; canonical `Type:id` exists only after alias resolution) via `/add` with `node_set=structural`, then verified in `/graph` after cognify (Cognee Cloud has no custom DataPoints; spike S3).
 - Semantic ingest: `POST /add` with `node_set` per source type, then `POST /cognify`.
 - Entity alignment: LLM entities → canonical IDs by alias table.
 - Retrieval: `POST /search` with `GRAPH_COMPLETION`, `verbose: true` and a fresh `sessionId`, returning `text_result` + `objects_result` triplets.
@@ -61,7 +61,7 @@ A fictional company, **Acme Pay**, with **canonical IDs shared across every sour
 
 Modules: `query/ask.py` (retrieve → guard → supersede → path), `query/paths.py`, `analysis/contradictions.py`, `store.py` (app.db).
 
-`app.db` tables: `sources`, `qa_log`, `feedback`, `alerts`, `eval_runs`.
+`app.db` tables: `sources`, `aliases`, `qa_log`, `feedback`, `alerts`, `eval_runs`.
 
 ### 2.4 Frontend track: `frontend/` (Next.js 16 App Router, Tailwind 4, npm)
 | Route | Content |
@@ -158,7 +158,7 @@ flowchart LR
 ## 7. Demo script (2 minutes, judging round)
 
 1. **(15 s)** Ask *"Why is payments on Postgres, and who should I talk to about it now?"* → answer, 3 evidence cards, 4-hop path, **STALE** badge (ADR-003 was superseded).
-2. **(15 s)** Ask *"What's our Kafka strategy?"* → **refuses**: "not in company knowledge". Point out that it never guesses.
+2. **(15 s)** Ask *"What's our mobile release cadence?"* → **refuses**: "not in company knowledge". Point out that it never guesses.
 3. **(40 s)** Go to Alerts and drop `MTG-0402.md` (a new meeting proposing DynamoDB for payments). Ingest runs → a **contradiction alert** appears: *"MTG-0402 contradicts active ADR-007 (Postgres for ACID). Raised by Arjun; owner Priya."*
 4. **(20 s)** Re-ask the first question → the answer now carries the contradiction warning.
 5. **(20 s)** Open the eval badge → **raw Cognee vs Permafrost** on the same 10 questions (grounded, stale flagged, refusals). This is the "not just a wrapper" answer. Then the architecture slide.

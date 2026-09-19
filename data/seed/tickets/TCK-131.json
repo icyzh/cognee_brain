@@ -1,0 +1,12 @@
+{
+  "id": "TCK-131",
+  "title": "Double refund on concurrent captures (incident)",
+  "body": "Incident: two concurrent captures and a refund on the same payment each read the balance, and the refund was written twice. The payment update and the two ledger entries are separate MongoDB documents (ADR-003), so there was no atomic write across them. Customer refunded twice; funds recovered manually. Postmortem led to the ledger storage review.",
+  "assignee": "marco",
+  "service": "svc-ledger",
+  "refs": [
+    "ADR-003"
+  ],
+  "status": "done",
+  "created": "2026-02-13"
+}

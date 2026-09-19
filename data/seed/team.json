@@ -1,0 +1,98 @@
+{
+  "people": [
+    {
+      "id": "priya",
+      "name": "Priya Sharma",
+      "aliases": [
+        "Priya",
+        "P. Sharma"
+      ],
+      "team": "platform"
+    },
+    {
+      "id": "marco",
+      "name": "Marco Rossi",
+      "aliases": [
+        "Marco"
+      ],
+      "team": "platform"
+    },
+    {
+      "id": "sam",
+      "name": "Samuel Okafor",
+      "aliases": [
+        "Sam",
+        "Sam O."
+      ],
+      "team": "platform"
+    },
+    {
+      "id": "nora",
+      "name": "Nora Lindqvist",
+      "aliases": [
+        "Nora"
+      ],
+      "team": "payments-product"
+    },
+    {
+      "id": "arjun",
+      "name": "Arjun Mehta",
+      "aliases": [
+        "Arjun"
+      ],
+      "team": "payments-product"
+    },
+    {
+      "id": "mei",
+      "name": "Mei Chen",
+      "aliases": [
+        "Mei"
+      ],
+      "team": "payments-product"
+    },
+    {
+      "id": "lena",
+      "name": "Lena Fischer",
+      "aliases": [
+        "Lena"
+      ],
+      "team": "data"
+    },
+    {
+      "id": "diego",
+      "name": "Diego Alvarez",
+      "aliases": [
+        "Diego"
+      ],
+      "team": "data"
+    }
+  ],
+  "teams": [
+    {
+      "id": "platform",
+      "name": "Platform",
+      "lead": "priya",
+      "owns": [
+        "svc-payments",
+        "svc-ledger",
+        "svc-auth"
+      ]
+    },
+    {
+      "id": "payments-product",
+      "name": "Payments Product",
+      "lead": "nora",
+      "owns": [
+        "svc-notify"
+      ]
+    },
+    {
+      "id": "data",
+      "name": "Data",
+      "lead": "lena",
+      "owns": [
+        "svc-reports"
+      ]
+    }
+  ]
+}

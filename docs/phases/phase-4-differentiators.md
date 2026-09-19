@@ -43,10 +43,10 @@ new doc ingested
 - [ ] Measure: a single meeting file end-to-end should take ≤ 30 s. If slower, pre-warm by running the extraction LLM call on upload and show progress.
 
 ### Frontend: `app/alerts/page.tsx`
-- [ ] Dropzone / file input → `ingestFile()` → progress steps: *parsing → structural → cognify → checking contradictions*
-- [ ] Alert feed: red cards `MTG-0402 contradicts ADR-007`, with reason, service, people involved (owner and raiser, from the graph), and a "view evidence" link to both sources
-- [ ] Stale alerts in amber below
-- [ ] Nav badge with the count of open alerts
+- [x] Dropzone / file input → `ingestFile()` → progress steps: *parsing → structural → cognify → checking contradictions*
+- [x] Alert feed: red cards `MTG-0402 contradicts ADR-007`, with reason, service, people involved (owner and raiser, from the graph), and a "view evidence" link to both sources
+- [x] Stale alerts in amber below
+- [x] Nav badge with the count of open alerts
 
 ---
 
@@ -55,7 +55,7 @@ new doc ingested
 ### Quality track: `backend/eval/`
 - [ ] `questions.json`, 10 items:
   ```json
-  {"q": "Why is payments on Postgres, and who owns it now?",
+  {"q": "Why is payments on Postgres, and who should I talk to about it now?",
    "expect_refs": ["ADR-007", "MTG-0312"], "expect_path_end": "platform", "expect_grounded": true}
   ```
   Mix: 5 multi-hop, 2 single-hop facts, 2 refusals (not in the corpus), 1 stale-decision question
@@ -70,7 +70,7 @@ new doc ingested
 - [ ] `GET /eval/latest` → `{decision_brain: {run_at, grounded_ok: 9, total: 10, hallucinated_sources: 0, ref_recall: 0.93, stale_flagged: 1}, raw_cognee: {…same fields…}}`
 
 ### Frontend
-- [ ] `EvalBadge` on the Ask page: `Eval 9/10 grounded · 0 hallucinated sources`; click → per-question table with a **raw Cognee vs Permafrost** column pair
+- [x] `EvalBadge` on the Ask page: `Eval 9/10 grounded · 0 hallucinated sources`; click → per-question table with a **raw Cognee vs Permafrost** column pair
 
 ---
 
@@ -82,6 +82,11 @@ new doc ingested
 - [ ] README: a 3-line "Use from an agent" section
 
 ---
+
+### Carried over from the P1 audit
+- [ ] Claims for the live file come from `proposals[].affects` (MTG-0402 has `decisions: []`); `structural.triples` ignores `proposals`, so no MTG-0402 → svc-payments edge exists until this is added
+- [ ] If the live file goes to a separate `live` dataset, `/graph`, path adjacency and `/ask` must read both datasets (`align.graph` / `graph_dump` default to `snow`)
+- [ ] `POST /ingest` currently returns ingest stats; the P4 upload variant should add `alerts: [...]`. The frontend `ingestFile()` posts a file with a 60 s timeout, so don't wire it until the upload route exists
 
 ## Acceptance criteria
 - Drop `data/live/MTG-0402.md` in the UI → a red contradiction alert (vs ADR-007) appears in ≤ 30 s, with a correct one-line reason

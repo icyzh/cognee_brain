@@ -1,0 +1,12 @@
+{
+  "id": "TCK-112",
+  "title": "SES receipt templates for capture and refund",
+  "body": "Build templated email receipts in SES for captured and refunded events (ADR-005). Handle bounces and complaints.",
+  "assignee": "mei",
+  "service": "svc-notify",
+  "refs": [
+    "ADR-005"
+  ],
+  "status": "done",
+  "created": "2026-02-03"
+}

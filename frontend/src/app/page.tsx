@@ -153,16 +153,17 @@ function AnswerMock() {
       </div>
       <div className="grid lg:grid-cols-3">
         <div className="flex flex-col gap-5 p-7 lg:col-span-2 lg:border-r lg:border-zinc-100">
-          <form className="flex gap-2">
+          <form action="/ask" className="flex gap-2">
             <label htmlFor="q" className="sr-only">
               Question
             </label>
             <input
               id="q"
+              name="q"
               defaultValue={SHOWCASE_QUESTION}
               className="h-11 min-w-0 flex-1 rounded-[10px] border border-zinc-200 dark:border-zinc-800 px-3.5 text-[15px] outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
             />
-            <button type="button" className="h-11 rounded-[10px] bg-zinc-950 dark:bg-white px-4 text-sm font-medium text-white dark:text-zinc-950">
+            <button type="submit" className="h-11 rounded-[10px] bg-zinc-950 dark:bg-white px-4 text-sm font-medium text-white dark:text-zinc-950">
               Ask
             </button>
           </form>
@@ -248,7 +249,7 @@ export default function Home() {
               GitHub
             </a>
             <a
-              href="#ask"
+              href="/ask"
               className="flex h-9 items-center rounded-lg bg-zinc-950 dark:bg-white px-4 text-sm font-medium text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200"
             >
               Get started
@@ -277,7 +278,7 @@ export default function Home() {
           </p>
           <div className="flex flex-wrap justify-center gap-3 pt-1">
             <a
-              href="#ask"
+              href="/ask"
               className="flex h-12 items-center rounded-[10px] bg-zinc-950 dark:bg-white px-5 text-[15px] font-medium text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200"
             >
               Get started

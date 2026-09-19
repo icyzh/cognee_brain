@@ -15,7 +15,7 @@
   # Cognee Cloud (used by the app)
   COGNEE_SERVICE_URL=https://<tenant>.aws.cognee.ai   # dashboard → API Keys → API Base URL
   COGNEE_API_KEY=...
-  COGNEE_DATASET=acme
+  COGNEE_DATASET=snow
   # Our own model: P4 contradiction judge + local-mode spike (Cognee Cloud ignores these)
   LLM_PROVIDER=openai
   LLM_MODEL=gpt-5.6-luna
@@ -60,12 +60,12 @@ Local mode (SDK in-process, gpt-5.6-luna) was spiked first: same answers, except
 - [x] `backend/app/main.py`: FastAPI app, CORS for `http://localhost:3000`, `GET /health` → `{status, cognee_version, cognee_configured, dataset, llm_model}`
 - [x] `backend/app/cognee_client.py` stub with the final function signatures (bodies filled in P1/P2):
   ```python
-  async def add_structural(triples: list[tuple[str, str, str]], dataset: str) -> str: ...  # text triples → /add; data_id
-  async def add_text(text: str, node_set: list[str], dataset: str) -> str: ...            # /add; data_id
+  async def add_structural(triples: list[tuple[str, str, str]], dataset: str, filename: str | None = None) -> str: ...  # text triples → /add; data_id
+  async def add_text(text: str, node_set: list[str], dataset: str, filename: str | None = None) -> str: ...  # /add; data_id
+  # P1 added: ensure_dataset, dataset_id, delete_dataset, delete_data (REST helpers)
   async def build(dataset: str) -> None: ...                                              # /cognify
   async def ask(question: str) -> RawResult: ...     # /search GRAPH_COMPLETION verbose: answer + triplets + chunks
-  async def graph(focus: str | None, depth: int) -> GraphDump: ...                        # /datasets/{id}/graph
-  async def missing_edges(expected: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]: ...  # P1 edge check
+  async def graph_dump(dataset, **params) -> GraphDump: ...          # /datasets/{id}/graph (raw); canonical view + missing_edges live in ingest/align.py (P1)
   ```
 - [x] `backend/app/store.py`: `sqlite3` connection + `init_db()` creating `sources, aliases, qa_log, feedback, alerts, eval_runs`
 - [x] Update `scripts/init.sh` if new setup steps are needed

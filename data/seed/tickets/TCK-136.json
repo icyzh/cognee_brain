@@ -1,0 +1,12 @@
+{
+  "id": "TCK-136",
+  "title": "Require Idempotency-Key on payment writes",
+  "body": "Add Idempotency-Key handling to authorise, capture and refund: store key and response for 24h, replay on repeat, 422 on body mismatch (ADR-008).",
+  "assignee": "marco",
+  "service": "svc-payments",
+  "refs": [
+    "ADR-008"
+  ],
+  "status": "done",
+  "created": "2026-03-06"
+}

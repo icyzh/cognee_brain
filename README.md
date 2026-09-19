@@ -6,7 +6,7 @@ Permafrost is a mini Company Brain built on Cognee. It connects a company's docs
 
 ## The idea
 
-A new engineer asks, *"Why is payments on Postgres, and who owns it now?"* The answer exists, but it is scattered: an ADR records the decision, a meeting note records who made it, a ticket records the migration, and the org chart records who owns the service today. No single document holds the whole answer.
+A new engineer asks, *"Why is payments on Postgres, and who should I talk to about it now?"* The answer exists, but it is scattered: an ADR records the decision, a meeting note records who made it, a ticket records the migration, and the org chart records who owns the service today. No single document holds the whole answer.
 
 Keyword search finds the pieces but not the links between them. Chatbots that answer from vector search alone can produce a confident answer with no trail behind it. Permafrost keeps the links between documents as first-class graph edges, so every answer shows the chain of documents and people it came from.
 
@@ -22,7 +22,7 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 
 Permafrost does not rely on the LLM to invent the relationships its answers depend on.
 
-- The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `decided_in`, `affects`, `supersedes`, `references`) come from source metadata and canonical IDs, and ingestion fails if any expected edge is missing from the graph.
+- The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `led_by`, `decided_in`, `affects`, `owned_by`, `supersedes`, `references`, `produced`) come from source metadata and canonical IDs, and ingestion fails if any expected edge is missing from the graph.
 - The LLM handles only prose: entities, topics and the reasoning behind decisions. Those entities are then linked back to the canonical nodes.
 - A grounding guard answers only from retrieved context. Each answer carries `evidence[]`, `path[]` and `warnings[]`, and a supersede check flags stale decisions.
 
@@ -42,14 +42,15 @@ The full design is in [`docs/architecture.md`](docs/architecture.md): ingestion 
 
 ## Status
 
-The frontend and backend scaffolds are in place, and the backend currently serves only `GET /health`. Ingestion, `/ask`, the graph explorer and the seed data are still to be built, following [`docs/architecture.md`](docs/architecture.md).
+Phases 0–1 are done: Cognee Cloud spike, seed data (Snow Pay, `data/seed/`), and ingestion (`POST /ingest`, `GET /sources`, `GET /graph`). `/ask` and the UI wiring follow [`docs/plan.md`](docs/plan.md).
 
 ## Run locally
 
 Prerequisites: Node.js 20+, npm, [uv](https://docs.astral.sh/uv/) and Python 3.12+.
 
 ```bash
-bash scripts/init.sh
+bash scripts/init.sh   # then fill COGNEE_SERVICE_URL / COGNEE_API_KEY in backend/.env
+cd backend && uv run python -m app.ingest --reset   # build the graph once (~5 min)
 cd backend && uv run uvicorn app.main:app --reload --port 8000
 cd frontend && npm run dev
 ```

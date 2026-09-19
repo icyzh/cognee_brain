@@ -1,0 +1,12 @@
+{
+  "id": "TCK-125",
+  "title": "Per-key rate limits at the API gateway",
+  "body": "Configure gateway rate limiting per API key with limits read from svc-auth: 100 rps default, lower on authorise, 429 with Retry-After (ADR-006).",
+  "assignee": "sam",
+  "service": "svc-auth",
+  "refs": [
+    "ADR-006"
+  ],
+  "status": "done",
+  "created": "2026-02-20"
+}

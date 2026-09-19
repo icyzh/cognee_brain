@@ -1,0 +1,12 @@
+{
+  "id": "TCK-121",
+  "title": "Set up nightly Postgres read replica for reports",
+  "body": "Create the Postgres read replica of ledger data and the nightly load job. Point svc-reports queries at the replica only (ADR-004).",
+  "assignee": "diego",
+  "service": "svc-reports",
+  "refs": [
+    "ADR-004"
+  ],
+  "status": "done",
+  "created": "2026-02-09"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "TCK-118",
+  "title": "Nightly merchant report job times out",
+  "body": "The nightly settlement report for large merchants times out after 2 hours. It starts before the nightly replica load (ADR-004) finishes and then waits on locks. Needs rescheduling or a dependency on the load job.",
+  "assignee": "diego",
+  "service": "svc-reports",
+  "refs": [
+    "ADR-004"
+  ],
+  "status": "open",
+  "created": "2026-02-24"
+}

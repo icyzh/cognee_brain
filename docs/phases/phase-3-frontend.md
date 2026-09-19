@@ -30,29 +30,29 @@ components/
 ## Tasks
 
 ### Wiring
-- [ ] `lib/types.ts` mirrors the P2 contract exactly
-- [ ] `lib/api.ts`: `fetch` wrappers with a timeout (25 s) and typed errors; mock switch via env
-- [ ] `frontend/.env.local.example`: `NEXT_PUBLIC_API_URL=http://localhost:8000`
+- [x] `lib/types.ts` mirrors the P2 contract exactly
+- [x] `lib/api.ts`: `fetch` wrappers with a timeout (25 s) and typed errors; mock switch via env
+- [x] `frontend/.env.local.example`: `NEXT_PUBLIC_API_URL=http://localhost:8000`
 
 ### Ask page (`/`)
-- [ ] `AskBox`: input + button, Enter to submit, **3 suggested-question chips** (showcase, refusal, one more multi-hop) that also serve as demo shortcuts
-- [ ] Loading state: skeleton + a "retrieving from graph…" line (queries take about 8 s against Cognee Cloud (P0 S7))
-- [ ] `AnswerPanel`: answer text; if `grounded=false`, a neutral "Not in company knowledge" state (a feature, not an error)
-- [ ] `WarningBanner`: one per warning; amber = stale, red = contradiction
-- [ ] `EvidenceCard`: source-type chip (ADR / Ticket / Meeting), ref, snippet, file path; the colour per source matches the diagram
-- [ ] `HopPath`: horizontal chain of pills `svc-payments → ADR-007 → MTG-0312 → priya → platform` with the rel label on each arrow and a hop count. Pill colour by node type. Wraps on narrow screens.
-- [ ] `FeedbackBar`: 👍/👎 → `POST /feedback`
-- [ ] Error state: backend down or timeout → message + retry button
+- [x] `AskBox`: input + button, Enter to submit, **3 suggested-question chips** (showcase, refusal, one more multi-hop) that also serve as demo shortcuts
+- [x] Loading state: skeleton + a "retrieving from graph…" line (queries take about 8 s against Cognee Cloud (P0 S7))
+- [x] `AnswerPanel`: answer text; if `grounded=false`, a neutral "Not in company knowledge" state (a feature, not an error)
+- [x] `WarningBanner`: one per warning; amber = stale, red = contradiction
+- [x] `EvidenceCard`: source-type chip (ADR / Ticket / Meeting), ref, snippet, file path; the colour per source matches the diagram
+- [x] `HopPath`: horizontal chain of pills `svc-payments → ADR-007 → MTG-0312 → priya → platform` with the rel label on each arrow and a hop count. Pill colour by node type. Wraps on narrow screens.
+- [x] `FeedbackBar`: 👍/👎 → `POST /feedback`
+- [x] Error state: backend down or timeout → message + retry button
 
 ### Sources page (`/sources`)
-- [ ] Table: ref, type, path, ingested_at, hash (short)
+- [x] Table: ref, type, path, ingested_at, hash (short)
 
 ### Styling
-- [ ] Tailwind 4 only; no component library needed
-- [ ] Node-type colours consistent with `architecture.png` (Service blue, Decision amber, Person/Team green, stale red)
+- [x] Tailwind 4 only; no component library needed
+- [x] Node-type colours consistent with `architecture.png` (Service blue, Decision amber, Person/Team green, stale red)
 
 ### Stretch: graph explorer (`/graph`)
-- [ ] Only if P4 is done early. Consider `react-force-graph-2d` (1 dependency) over `GET /graph?focus=&depth=2`, and highlight the last answer's path.
+- [x] Only if P4 is done early. Consider `react-force-graph-2d` (1 dependency) over `GET /graph?focus=&depth=2`, and highlight the last answer's path.
 
 ---
 

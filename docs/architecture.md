@@ -107,7 +107,7 @@ flowchart LR
 | Backend | FastAPI | HTTP API, ingestion orchestration, query pipeline, grounding rules |
 | Knowledge | Cognee | Graph + vector memory, LLM extraction, graph-completion retrieval |
 | Stores | Cognee Cloud tenant | Managed graph, vector and relational stores, reached over REST |
-| App state | `app.db` (stdlib `sqlite3`) | Q&A history, feedback, eval runs |
+| App state | `app.db` (stdlib `sqlite3`) | Ingested sources (hash, Cognee data_ids), aliases, Q&A history, feedback, alerts, eval runs |
 | Model | Cognee Cloud tenant | LLM and embeddings are configured on the tenant, not in our `.env` |
 
 ---
@@ -131,9 +131,9 @@ flowchart TB
     SKIP["Skip: already ingested"]
 
     subgraph STRUCT["Structural path: from metadata, verified"]
-        M1["Render metadata as text triples, e.g. Decision:ADR-007 affects Service:svc-payments"]
-        M2["Canonical Type:id names: Person, Team, Service, Decision, Ticket, Meeting"]
-        M3["Triples: attended_by, assigned_to, member_of, owns, decided_in, affects, supersedes, references"]
+        M1["Render metadata as text triples with raw IDs, e.g. ADR-007 affects svc-payments"]
+        M2["After cognify: alias index maps LLM names to Type:id (Person, Team, Service, Decision, Ticket, Meeting)"]
+        M3["Triples: member_of, owns, led_by, affects, decided_in, owned_by, supersedes, assigned_to, about, references, attended_by, produced"]
     end
 
     subgraph SEM["Semantic path: LLM"]
@@ -167,10 +167,10 @@ flowchart TB
 
 | Source | Format | Structural edges (metadata) | Semantic content (LLM) |
 |---|---|---|---|
-| ADR / docs | Markdown + YAML frontmatter (`id`, `status`, `decided_in`, `affects`, `supersedes`, `owner`) | `Decision -affects-> Service`, `Decision -supersedes-> Decision`, `Decision -decided_in-> Meeting` | Rationale, alternatives, trade-offs |
+| ADR / docs | Markdown + YAML frontmatter (`id`, `status`, `decided_in`, `affects`, `supersedes`, `owner`) | `Decision -affects-> Service`, `Decision -supersedes-> Decision`, `Decision -decided_in-> Meeting`, `Decision -owned_by-> Person` | Rationale, alternatives, trade-offs |
 | Tickets | JSON (`id`, `title`, `assignee`, `service`, `refs`, `status`) | `Ticket -assigned_to-> Person`, `Ticket -about-> Service`, `Ticket -references-> Decision` | Problem description, discussion |
-| Meeting notes | Markdown (`date`, `attendees`, `decisions`) | `Meeting -attended_by-> Person`, `Meeting -produced-> Decision` | Who argued what, open questions |
-| Org chart | JSON | `Person -member_of-> Team`, `Team -owns-> Service` | none |
+| Meeting notes | Markdown (`date`, `title`, `attendees`, `decisions`) | `Meeting -attended_by-> Person`, `Meeting -produced-> Decision` | Who argued what, open questions |
+| Org chart | JSON | `Person -member_of-> Team`, `Team -owns-> Service`, `Team -led_by-> Person` | A short `[ORG CHART]` text doc (who leads what, aliases) |
 
 ---
 
@@ -194,6 +194,8 @@ flowchart LR
     M -- attended_by --> P
     M -- produced --> D
     D -- supersedes --> D
+    D -- owned_by --> P
+    T -- led_by --> P
     K -- assigned_to --> P
     K -- about --> S
     K -- references --> D
@@ -225,7 +227,7 @@ sequenceDiagram
     participant SC as Supersede checker
     participant DB as app.db
 
-    U->>FE: Why is payments on Postgres and who owns it now?
+    U->>FE: Why is payments on Postgres, and who should I talk to about it now?
     FE->>API: POST /ask {question}
     API->>R: retrieve(question)
     R->>C: POST /search {searchType: GRAPH_COMPLETION, verbose: true, sessionId: fresh}
@@ -369,26 +371,29 @@ backend/
     config.py               # env loading
     cognee_client.py        # the ONLY module talking to Cognee (Cloud REST)
     ingest/
-      loaders.py            # md/json parsing, normalization, hashing
-      structural.py         # metadata -> canonical text triples
-      semantic.py           # /add + /cognify with node_set
+      __main__.py           # python -m app.ingest: add -> cognify -> showcase edge check
+      loaders.py            # md/json parsing, hashing, stable source paths
+      structural.py         # metadata -> text triples (raw IDs)
+      semantic.py           # records -> transcript-shaped text
+      align.py              # alias index, missing_edges, canonical /graph view
     query/
       ask.py                # retrieve -> guard -> supersede -> path
-      paths.py              # BFS over graph() -> path[]
-    store.py                # sqlite3 app.db (history, feedback)
+      paths.py              # BFS over align.canonical_edges(graph_dump()) -> path[]
+    store.py                # sqlite3 app.db (sources, aliases, history, feedback, alerts, eval)
+  tests/test_ingest.py      # offline checks: uv run python -m tests.test_ingest
   eval/
     questions.json          # 10 Qs + expected sources/path
     run_eval.py
 frontend/
   src/app/
-    page.tsx                # Ask page
-    graph/page.tsx          # explorer
-    sources/page.tsx
+    page.tsx                # landing
+    (app)/ask/ graph/ sources/ alerts/   # app pages
   src/components/
     EvidenceCard.tsx
     HopPath.tsx
-data/seed/
-  adrs/  tickets/  meetings/  team.json
+data/
+  seed/  adrs/  tickets/  meetings/  team.json  README.md (story bible)
+  live/  MTG-0402.md        # not pre-ingested; P4 demo trigger
 ```
 
 ---

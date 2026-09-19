@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS sources (
     type TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     data_id TEXT,  -- Cognee data_id from /add; maps retrieved chunks back to this file
+    triples_data_id TEXT,  -- data_id of this file's structural triples doc
     ingested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS aliases (
@@ -66,3 +67,46 @@ def connect() -> sqlite3.Connection:
 def init_db() -> None:
     with closing(connect()) as conn, conn:
         conn.executescript(SCHEMA)
+        if "triples_data_id" not in {r[1] for r in conn.execute("PRAGMA table_info(sources)")}:
+            conn.execute("ALTER TABLE sources ADD COLUMN triples_data_id TEXT")  # app.db from Phase 0
+
+
+def get_source(path: str) -> sqlite3.Row | None:
+    with closing(connect()) as conn:
+        return conn.execute("SELECT * FROM sources WHERE path = ?", (path,)).fetchone()
+
+
+def upsert_source(
+    path: str, ref: str, type: str, content_hash: str, data_id: str | None, triples_data_id: str | None
+) -> None:
+    with closing(connect()) as conn, conn:
+        conn.execute(
+            """INSERT INTO sources (path, ref, type, content_hash, data_id, triples_data_id) VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(path) DO UPDATE SET ref=excluded.ref, type=excluded.type, content_hash=excluded.content_hash,
+                 data_id=excluded.data_id, triples_data_id=excluded.triples_data_id, ingested_at=CURRENT_TIMESTAMP""",
+            (path, ref, type, content_hash, data_id, triples_data_id),
+        )
+
+
+def list_sources() -> list[dict]:
+    with closing(connect()) as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM sources ORDER BY type, ref")]
+
+
+def set_aliases(mapping: dict[str, str]) -> None:
+    with closing(connect()) as conn, conn:
+        conn.executemany(  # OR IGNORE: the first mapping wins; a later single-file ingest can't re-map a name
+            "INSERT OR IGNORE INTO aliases (name, canonical_id) VALUES (?, ?)",
+            [(name.lower(), cid) for name, cid in mapping.items()],
+        )
+
+
+def get_aliases() -> dict[str, str]:
+    with closing(connect()) as conn:
+        return dict(conn.execute("SELECT name, canonical_id FROM aliases").fetchall())
+
+
+def reset_ingest_state() -> None:
+    with closing(connect()) as conn, conn:
+        conn.execute("DELETE FROM sources")
+        conn.execute("DELETE FROM aliases")

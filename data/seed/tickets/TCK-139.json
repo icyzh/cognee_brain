@@ -1,0 +1,13 @@
+{
+  "id": "TCK-139",
+  "title": "SDKs should honour Retry-After on 429",
+  "body": "Merchant SDKs retry 429s immediately, which makes throttling worse. Respect Retry-After (ADR-006) and send an Idempotency-Key on every retry (ADR-008).",
+  "assignee": "arjun",
+  "service": "svc-payments",
+  "refs": [
+    "ADR-006",
+    "ADR-008"
+  ],
+  "status": "in_progress",
+  "created": "2026-03-09"
+}

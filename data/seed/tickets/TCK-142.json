@@ -1,0 +1,12 @@
+{
+  "id": "TCK-142",
+  "title": "Migrate ledger tables to Postgres",
+  "body": "Migrate payment and ledger data from MongoDB to Postgres per ADR-007. Backfill, short write freeze in the Sunday window, delta sync, cutover. All money movements written in one serializable transaction with a non-negative balance constraint.",
+  "assignee": "priya",
+  "service": "svc-payments",
+  "refs": [
+    "ADR-007"
+  ],
+  "status": "in_progress",
+  "created": "2026-03-13"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "TCK-104",
+  "title": "Issue JWT access tokens and refresh flow in svc-auth",
+  "body": "Implement 15-minute JWT access tokens and server-side refresh tokens per ADR-001. Publish the JWKS endpoint so services can verify locally.",
+  "assignee": "sam",
+  "service": "svc-auth",
+  "refs": [
+    "ADR-001"
+  ],
+  "status": "done",
+  "created": "2026-01-19"
+}

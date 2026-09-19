@@ -1,0 +1,12 @@
+{
+  "id": "TCK-147",
+  "title": "Add SMS provider to notify",
+  "body": "Integrate an SMS provider into svc-notify for receipts and refund alerts (ADR-009). Per-merchant channel preferences and per-channel retries.",
+  "assignee": "mei",
+  "service": "svc-notify",
+  "refs": [
+    "ADR-009"
+  ],
+  "status": "open",
+  "created": "2026-03-23"
+}

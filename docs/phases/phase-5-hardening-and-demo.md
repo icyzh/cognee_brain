@@ -7,7 +7,7 @@
 ---
 
 ## Reliability (Backend + Cognee)
-- [ ] **Demo reset:** after the final seed ingest, freeze the `acme` dataset (no more re-ingest) and back up `app.db` → `snapshots/demo/`; `scripts/restore_demo.sh` deletes the `live` dataset over REST (`DELETE /api/v1/datasets/{id}`) and restores `app.db`
+- [ ] **Demo reset:** after the final seed ingest, freeze the `snow` dataset (no more re-ingest) and back up `app.db` → `snapshots/demo/`; `scripts/restore_demo.sh` deletes the `live` dataset over REST (`DELETE /api/v1/datasets/{id}`) and restores `app.db`
 - [ ] **Cached fallback:** answers for the 3 scripted questions stored in `app.db`. If the live call fails or takes > 20 s, serve the cache (flagged `cached: true` in the logs, not hidden from Q&A if asked)
 - [ ] Retries with backoff on Cognee Cloud 429/5xx; clear error JSON (`{error, retryable}`), no stack traces to the client
 - [ ] Structured logs (JSON lines): request id, endpoint, latency, tokens, grounded
@@ -15,7 +15,7 @@
 - [ ] Pin: `uv.lock` committed, `package-lock.json` committed, `COGNEE_*` vars in `.env.example` (models are tenant-managed)
 
 ## Production standards (All)
-- [ ] `backend`: type hints, `ruff check` clean, the 3 test files pass (`uv run pytest`)
+- [ ] `backend`: type hints, `ruff check` clean, the test modules pass (`uv run python -m tests.test_ingest` etc.; plain asserts, no pytest dependency)
 - [ ] `frontend`: `npm run lint` + `npm run build` pass; no console errors
 - [ ] No secrets in the repo; `.env.example` for both apps
 - [ ] `scripts/init.sh` → one command to set up; `scripts/dev.sh` runs both servers

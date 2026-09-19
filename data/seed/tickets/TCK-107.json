@@ -1,0 +1,12 @@
+{
+  "id": "TCK-107",
+  "title": "Monthly signing key rotation for JWTs",
+  "body": "Automate monthly rotation of the JWT signing keys (ADR-001). Keep the previous key in the key set for one hour so in-flight tokens still verify.",
+  "assignee": "sam",
+  "service": "svc-auth",
+  "refs": [
+    "ADR-001"
+  ],
+  "status": "done",
+  "created": "2026-01-26"
+}

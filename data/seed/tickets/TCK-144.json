@@ -1,0 +1,13 @@
+{
+  "id": "TCK-144",
+  "title": "Switch reports replica to native Postgres replication",
+  "body": "Once the ledger is on Postgres (ADR-007), replace the nightly export into the reports replica (ADR-004) with native Postgres replication.",
+  "assignee": "diego",
+  "service": "svc-reports",
+  "refs": [
+    "ADR-004",
+    "ADR-007"
+  ],
+  "status": "open",
+  "created": "2026-03-16"
+}
