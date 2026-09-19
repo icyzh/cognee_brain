@@ -5,7 +5,7 @@ A mini Company Brain on **Cognee**. It ingests docs, tickets and meeting notes i
 > **Full diagram:** [`architecture.excalidraw`](architecture.excalidraw) (open at excalidraw.com), with a PNG preview at [`architecture.png`](architecture.png).
 >
 > **Excalidraw:** every diagram below is a Mermaid `flowchart` or `sequenceDiagram`, the two types Excalidraw's converter supports. In Excalidraw, open **More tools → Mermaid to Excalidraw** and paste a block.
-> Items marked ⚠️ are Cognee APIs to confirm against the pinned version before building on them.
+> Cognee APIs were confirmed in the Phase 0 spike ([phase-0](phases/phase-0-setup-and-spike.md), S1–S9) against **Cognee Cloud** REST (`/api/v1/*`), using SDK 1.6.0 for reference.
 
 ---
 
@@ -47,15 +47,15 @@ flowchart LR
         end
     end
 
-    subgraph COG["Cognee knowledge layer"]
-        C1["remember / add"]
-        C2["cognify: LLM extraction"]
-        C3["add_data_points ⚠️"]
-        C4["recall / search GRAPH_COMPLETION"]
-        subgraph STORES["File-based stores (.cognee_system)"]
-            S1[("Graph DB: Kuzu")]
-            S2[("Vector DB: LanceDB")]
-            S3[("Relational: SQLite")]
+    subgraph COG["Cognee Cloud: REST /api/v1"]
+        C1["POST /add with node_set"]
+        C2["POST /cognify: LLM extraction"]
+        C3["Structural triples as text via /add"]
+        C4["POST /search GRAPH_COMPLETION verbose"]
+        subgraph STORES["Managed tenant stores"]
+            S1[("Graph DB")]
+            S2[("Vector DB")]
+            S3[("Relational")]
         end
     end
 
@@ -63,7 +63,7 @@ flowchart LR
         A1[("app.db: SQLite stdlib sqlite3")]
     end
 
-    LLM["LLM + embeddings via LiteLLM env config"]
+    LLM["LLM + embeddings: tenant-managed"]
 
     SRC --> B1
     B1 --> I1
@@ -106,22 +106,22 @@ flowchart LR
 | Frontend | Next.js App Router | Ask UI, evidence cards, hop-path rendering, graph explorer |
 | Backend | FastAPI | HTTP API, ingestion orchestration, query pipeline, grounding rules |
 | Knowledge | Cognee | Graph + vector memory, LLM extraction, graph-completion retrieval |
-| Stores | Kùzu / LanceDB / SQLite | Cognee's file-based defaults, with zero infrastructure |
+| Stores | Cognee Cloud tenant | Managed graph, vector and relational stores, reached over REST |
 | App state | `app.db` (stdlib `sqlite3`) | Q&A history, feedback, eval runs |
-| Model | LiteLLM (env vars) | LLM and embedding provider, swappable by config |
+| Model | Cognee Cloud tenant | LLM and embeddings are configured on the tenant, not in our `.env` |
 
 ---
 
 ## 2. Ingestion pipeline (hybrid graph construction)
 
-The core design decision is that **structure comes from metadata and meaning comes from the LLM**. Edges that the multi-hop demo depends on are deterministic, so they cannot be hallucinated.
+The core design decision is that **structure comes from metadata and meaning comes from the LLM**. Edges that the multi-hop demo depends on are generated from metadata as canonical triples, and after `cognify` each one is verified in `GET /datasets/{id}/graph`. A missing edge fails ingestion instead of quietly breaking the demo.
 
 ```mermaid
 flowchart TB
     subgraph IN["Raw sources"]
         R1["ADR-007.md"]
         R2["TCK-142.json"]
-        R3["2026-03-12-arch-sync.md"]
+        R3["MTG-0312.md"]
         R4["team.json"]
     end
 
@@ -130,15 +130,15 @@ flowchart TB
     H{"Content hash seen?"}
     SKIP["Skip: already ingested"]
 
-    subgraph STRUCT["Structural path: deterministic"]
-        M1["Map metadata to typed DataPoints"]
-        M2["Person, Team, Service, Decision, Ticket, Meeting, Document"]
-        M3["Edges: attended_by, assigned_to, member_of, owns, decided_in, affects, supersedes, references"]
+    subgraph STRUCT["Structural path: from metadata, verified"]
+        M1["Render metadata as text triples, e.g. Decision:ADR-007 affects Service:svc-payments"]
+        M2["Canonical Type:id names: Person, Team, Service, Decision, Ticket, Meeting"]
+        M3["Triples: attended_by, assigned_to, member_of, owns, decided_in, affects, supersedes, references"]
     end
 
     subgraph SEM["Semantic path: LLM"]
         T1["Transcript-shaped text with speaker and timestamp"]
-        T2["remember with node_set = source type"]
+        T2["/add with node_set = source type"]
         T3["cognify: entities, topics, rationale edges"]
     end
 
@@ -203,7 +203,9 @@ flowchart LR
     K -- about_topic --> TOP
 ```
 
-`DataPoint` models are pydantic classes subclassing Cognee's `DataPoint` ⚠️, with relationship fields as typed references. Every node carries `id` (canonical), `source`, `source_ref` (file and line/field) and `created_at`, which drive citations.
+Cognee Cloud has no REST route for custom `DataPoint`s (`add_data_points` is in-process only; spike S3). Structural edges are therefore sent as canonical text triples into `/add` (`node_set=structural`), and P1 checks that every expected edge exists in `GET /datasets/{id}/graph`. A `/cognify` `graphModel` JSON schema can type the nodes if needed. Citations come from the `DocumentChunk` behind each retrieved triplet: `/add` returns a `data_id` per file, which `app.db` `sources` maps back to the seed file.
+
+`cognify` also creates its own node types alongside ours: `TextDocument`, `DocumentChunk`, `TextSummary`, `Entity`, `EntityType` and `NodeSet` (spike S9). The graph explorer should hide or dim them.
 
 ---
 
@@ -216,7 +218,7 @@ sequenceDiagram
     participant FE as Next.js Ask page
     participant API as FastAPI /ask
     participant R as Retriever
-    participant C as Cognee recall GRAPH_COMPLETION
+    participant C as Cognee Cloud /search GRAPH_COMPLETION
     participant G as Graph + vector stores
     participant L as LLM
     participant GG as Grounding guard
@@ -226,21 +228,21 @@ sequenceDiagram
     U->>FE: Why is payments on Postgres and who owns it now?
     FE->>API: POST /ask {question}
     API->>R: retrieve(question)
-    R->>C: recall(query, type=GRAPH_COMPLETION, verbose ⚠️)
+    R->>C: POST /search {searchType: GRAPH_COMPLETION, verbose: true, sessionId: fresh}
     C->>G: embed query, vector top-k to seed nodes
     G-->>C: seed nodes
     C->>G: project subgraph around seeds, rank triplets
     G-->>C: triplets and chunks
     C->>L: answer from context only
     L-->>C: answer text
-    C-->>R: answer + context triplets + source objects
+    C-->>R: text_result + context_result + objects_result triplets
     R->>GG: check context
     alt no relevant context
         GG-->>API: refuse: not in company knowledge
     else grounded
         GG->>SC: decisions in path
         SC->>G: any incoming supersedes edge?
-        G-->>SC: D-07 superseded by D-14
+        G-->>SC: ADR-003 superseded by ADR-007
         SC-->>API: answer + evidence + path + stale warnings
     end
     API->>DB: log question, answer, latency, sources
@@ -250,23 +252,28 @@ sequenceDiagram
 
 ### `/ask` response contract
 
+Frozen in [phase-2](phases/phase-2-query-pipeline.md#contract-frozen-at-the-start-of-this-phase-frontend-builds-against-it); typed in `frontend/src/lib/types.ts`.
+
 ```json
 {
   "answer": "Payments moved to Postgres per ADR-007 (decided 2026-03-12). Platform Team owns it; talk to Priya.",
+  "grounded": true,
   "evidence": [
-    {"source": "adr", "ref": "ADR-007.md", "snippet": "We choose Postgres for ACID..."},
-    {"source": "meeting", "ref": "2026-03-12-arch-sync.md", "snippet": "Priya: ..."},
-    {"source": "ticket", "ref": "TCK-142", "snippet": "Migrate ledger tables..."}
+    {"source": "adr", "ref": "ADR-007", "path": "adrs/ADR-007.md", "snippet": "The ledger needs multi-row ACID ..."},
+    {"source": "meeting", "ref": "MTG-0312", "path": "meetings/MTG-0312.md", "snippet": "Priya: Postgres gives us transactions ..."},
+    {"source": "ticket", "ref": "TCK-142", "path": "tickets/TCK-142.json", "snippet": "Migrate ledger tables to Postgres"}
   ],
   "path": [
-    {"from": "Service:payments", "rel": "affected_by", "to": "Decision:ADR-007"},
-    {"from": "Decision:ADR-007", "rel": "decided_in", "to": "Meeting:2026-03-12"},
-    {"from": "Meeting:2026-03-12", "rel": "attended_by", "to": "Person:priya"},
-    {"from": "Person:priya", "rel": "member_of", "to": "Team:platform"}
+    {"from": {"id": "svc-payments", "type": "Service"}, "rel": "affected_by", "to": {"id": "ADR-007", "type": "Decision"}},
+    {"from": {"id": "ADR-007", "type": "Decision"}, "rel": "decided_in", "to": {"id": "MTG-0312", "type": "Meeting"}},
+    {"from": {"id": "MTG-0312", "type": "Meeting"}, "rel": "attended_by", "to": {"id": "priya", "type": "Person"}},
+    {"from": {"id": "priya", "type": "Person"}, "rel": "member_of", "to": {"id": "platform", "type": "Team"}}
   ],
-  "warnings": [],
-  "grounded": true,
-  "latency_ms": 2140
+  "warnings": [
+    {"kind": "stale", "node": "ADR-003", "message": "ADR-003 (MongoDB) superseded by ADR-007 on 2026-03-12"}
+  ],
+  "latency_ms": 7900,
+  "qa_id": 42
 }
 ```
 
@@ -276,7 +283,7 @@ sequenceDiagram
 |---|---|---|
 | Relational / "who / why / what affects" (default) | `GRAPH_COMPLETION` | Vector-seeded subgraph gives multi-hop context |
 | Plain fact lookup | `CHUNKS` / `RAG_COMPLETION` | Cheaper, and graph adds noise |
-| Deep chains (3+ hops) | Context-extension / CoT retriever ⚠️ | Iterative expansion, roughly one hop per round |
+| Deep chains (3+ hops) | `GRAPH_COMPLETION_CONTEXT_EXTENSION` / `GRAPH_COMPLETION_COT` (both exist in 1.6.0) | Iterative expansion, roughly one hop per round |
 
 MVP ships **`GRAPH_COMPLETION` only**. The router is listed under *Next*.
 
@@ -286,31 +293,29 @@ MVP ships **`GRAPH_COMPLETION` only**. The router is listed under *Next*.
 
 ```mermaid
 flowchart LR
-    subgraph HOST["Single host: no Docker"]
+    subgraph HOST["Single host: no Docker, no local graph DB"]
         subgraph FEP["frontend/ npm run dev or start :3000"]
             NX["Next.js"]
         end
         subgraph BEP["backend/ uv run uvicorn :8000"]
             FA["FastAPI"]
-            CG["cognee library in-process"]
+            CG["app/cognee_client.py: httpx REST client"]
         end
         subgraph DISK["Local disk"]
-            K1[(".cognee_system: Kuzu, LanceDB, SQLite")]
             K2[("app.db")]
             K3["data/seed"]
         end
     end
-    EXT["LLM + embedding API"]
+    EXT["Cognee Cloud tenant: stores + LLM"]
 
     NX -- "REST JSON" --> FA
     FA --> CG
-    CG --> K1
     FA --> K2
     FA --> K3
     CG -- HTTPS --> EXT
 ```
 
-**Config (`backend/.env`):** `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, and `ENABLE_BACKEND_ACCESS_CONTROL=false` for a single-user demo. Cognee is configured through env vars, since `set_llm_config()` was removed in 1.2.x.
+**Config (`backend/.env`):** `COGNEE_SERVICE_URL` (tenant URL from the dashboard's API Keys page) and `COGNEE_API_KEY` (sent as `X-Api-Key`). Cognee Cloud runs its own hosted model (reported only as `litellm_proxy/litellm`). `LLM_MODEL` / `LLM_API_KEY` (gpt-5.6-luna) are ours: used by the P4 contradiction judge and the local-mode spike. Call REST directly, not `cognee.serve()`: the 1.6.0 SDK cloud client drops `node_set` on add and `sessionId` on search.
 
 ---
 
@@ -318,12 +323,12 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    A["Pre-demo: uv run python -m app.ingest"] --> B[("Graph built ahead of time on disk")]
+    A["Pre-demo: uv run python -m app.ingest"] --> B[("Graph built ahead of time in the Cognee Cloud dataset")]
     B --> C["Eval: 10 questions with expected sources and path"]
     C --> D{"Pass rate OK?"}
     D -- no --> E["Fix seed data or schema"]
     E --> A
-    D -- yes --> F["Freeze .cognee_system snapshot"]
+    D -- yes --> F["Freeze: stop re-ingesting the demo dataset"]
     F --> G["Demo"]
     G --> H{"LLM error or timeout?"}
     H -- retry with backoff --> G
@@ -333,9 +338,9 @@ flowchart TB
 | Risk | Mitigation |
 |---|---|
 | Hallucinated answer | Answer only from retrieved context, refuse when there is none, always return evidence |
-| Broken multi-hop path | Demo path runs over **deterministic metadata edges**, and canonical IDs avoid entity-resolution errors |
-| Ingestion slow or failing live | Graph built before the demo and snapshotted; content-hash dedupe makes re-ingest idempotent |
-| LLM rate limits (~7k tokens per graph query) | Paid tier or high-TPM model, retries with backoff, cached fallback for the scripted query |
+| Broken multi-hop path | Demo path runs over **structural edges generated from metadata and verified after cognify**, and canonical IDs avoid entity-resolution errors |
+| Ingestion slow or failing live | Graph built before the demo and left untouched; content-hash dedupe makes re-ingest idempotent |
+| Cognee Cloud rate limits or slow queries (~8 s p50) | Tenant-managed model, retries with backoff, cached fallback for the scripted query |
 | Cognee API drift | Pinned version in `uv.lock`, with a thin `app/cognee_client.py` wrapper as the single integration point |
 | Stale knowledge | `supersedes` edges produce warnings in the answer |
 
@@ -345,11 +350,11 @@ flowchart TB
 
 | Concern | MVP | Scale-out |
 |---|---|---|
-| Graph store | Kùzu (embedded) | Neo4j / FalkorDB via Cognee config |
-| Vector store | LanceDB (embedded) | pgvector / Qdrant via Cognee config |
+| Graph store | Cognee Cloud (managed) | Dedicated tenant, or self-hosted Cognee with Neo4j / FalkorDB |
+| Vector store | Cognee Cloud (managed) | Self-hosted Cognee with pgvector / Qdrant |
 | Ingestion | Batch CLI over files | Connectors (Slack, Jira, Git) → queue → incremental ingest by content hash |
 | Tenancy / access | Single user | `node_set` / dataset per team, with permission filter at retrieval |
-| Cost | LLM extraction per document | Structural edges without LLM calls, LLM only for prose; cache embeddings |
+| Cost | LLM extraction per document | Structural triples are short, so their extraction is cheap; LLM spend goes mostly to prose; cache embeddings |
 | First bottleneck | LLM extraction throughput and cost | Batch plus a cheaper extraction model, and extract only changed documents |
 
 ---
@@ -358,19 +363,18 @@ flowchart TB
 
 ```
 backend/
-  pyproject.toml            # uv; cognee pinned
+  pyproject.toml            # uv; cognee SDK pinned (spike + reference)
   app/
     main.py                 # FastAPI app and routes
     config.py               # env loading
-    cognee_client.py        # the ONLY module importing cognee
+    cognee_client.py        # the ONLY module talking to Cognee (Cloud REST)
     ingest/
       loaders.py            # md/json parsing, normalization, hashing
-      models.py             # DataPoint schema (Person, Decision, ...)
-      structural.py         # metadata -> DataPoints + edges
-      semantic.py           # remember + cognify with node_set
+      structural.py         # metadata -> canonical text triples
+      semantic.py           # /add + /cognify with node_set
     query/
       ask.py                # retrieve -> guard -> supersede -> path
-      paths.py              # triplets -> path[]
+      paths.py              # BFS over graph() -> path[]
     store.py                # sqlite3 app.db (history, feedback)
   eval/
     questions.json          # 10 Qs + expected sources/path

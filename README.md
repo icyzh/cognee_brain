@@ -13,7 +13,7 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 ## What Decision Brain does
 
 - **Ingest** four source types from `data/seed/`: ADRs and docs (Markdown), tickets (JSON), meeting notes (Markdown) and the org chart (`team.json`).
-- **Build** a hybrid graph. Metadata becomes deterministic typed edges, and Cognee's LLM extraction adds entities, topics and reasoning from prose.
+- **Build** a hybrid graph. Metadata becomes canonical structural edges (verified in the graph after ingestion), and Cognee's LLM extraction adds entities, topics and reasoning from prose.
 - **Answer** questions through `POST /ask` using Cognee `GRAPH_COMPLETION` retrieval, and refuse when retrieval finds nothing relevant.
 - **Show** evidence cards, the hop path (`Service → Decision → Meeting → Person → Team`) and warnings when a cited decision has been superseded.
 - **Explore** the graph and the ingested sources directly.
@@ -22,7 +22,7 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 
 Decision Brain does not rely on the LLM to invent the relationships its answers depend on.
 
-- The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `decided_in`, `affects`, `supersedes`, `references`) come from source metadata and canonical IDs, so they cannot be hallucinated.
+- The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `decided_in`, `affects`, `supersedes`, `references`) come from source metadata and canonical IDs, and ingestion fails if any expected edge is missing from the graph.
 - The LLM handles only prose: entities, topics and the reasoning behind decisions. Those entities are then linked back to the canonical nodes.
 - A grounding guard answers only from retrieved context. Each answer carries `evidence[]`, `path[]` and `warnings[]`, and a supersede check flags stale decisions.
 
@@ -30,7 +30,7 @@ Decision Brain does not rely on the LLM to invent the relationships its answers 
 
 ![Decision Brain architecture](docs/architecture.png)
 
-The Next.js frontend talks to a FastAPI backend over REST. The backend runs Cognee in-process, and Cognee stores its graph (Kùzu), vectors (LanceDB) and metadata (SQLite) in local files, so no database server is needed. App state such as question history and feedback lives in a separate SQLite file (`app.db`) accessed with Python's built-in `sqlite3`. LLM and embedding providers are set through environment variables (LiteLLM), so switching providers is a config change.
+The Next.js frontend talks to a FastAPI backend over REST. The backend calls Cognee Cloud over REST; the graph, vector and metadata stores and the LLM are managed by the Cognee Cloud tenant, so no database server runs locally. App state such as question history and feedback lives in a separate SQLite file (`app.db`) accessed with Python's built-in `sqlite3`. Cognee Cloud is configured with `COGNEE_SERVICE_URL` and `COGNEE_API_KEY` in `backend/.env`.
 
 The full design is in [`docs/architecture.md`](docs/architecture.md): ingestion pipeline, graph schema, query sequence, reliability plan and scale-out path. The diagram source is [`docs/architecture.excalidraw`](docs/architecture.excalidraw).
 
@@ -38,8 +38,7 @@ The full design is in [`docs/architecture.md`](docs/architecture.md): ingestion 
 
 - Next.js, React, TypeScript and Tailwind CSS
 - Python, FastAPI and uv
-- Cognee, with Kùzu, LanceDB and SQLite as file-based stores
-- LiteLLM-compatible LLM and embedding providers
+- Cognee Cloud (REST API; managed graph, vector store and LLM)
 
 ## Status
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-(cd backend && uv sync)
+(cd backend && uv sync && { [ -f .env ] || cp .env.example .env; })
 (cd frontend && npm install)
 
 echo "Ready. Run backend: cd backend && uv run uvicorn app.main:app --reload --port 8000"

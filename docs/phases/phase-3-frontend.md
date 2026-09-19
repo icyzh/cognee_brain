@@ -1,0 +1,69 @@
+# Phase 3: Frontend Ask experience
+
+> **Goal:** the answer, evidence and path are *visible* in the browser in one glance. The UI is where judges see grounding and multi-hop.
+> **Tracks:** Frontend · **Est:** 2 h · **Depends on:** P0 (types + mock), then P2 (live API) · **Unblocks:** P4
+> ← [Phase 2](phase-2-query-pipeline.md) · next → [Phase 4](phase-4-differentiators.md)
+
+---
+
+## Structure (`frontend/src/`)
+```
+lib/
+  types.ts        # AskResponse, Evidence, PathEdge, Warning, Alert (from the P2 contract)
+  api.ts          # ask(), feedback(), alerts(), ingestFile(), evalLatest(); base URL from NEXT_PUBLIC_API_URL
+  mock.ts         # showcase + refusal responses (used when NEXT_PUBLIC_USE_MOCK=1)
+app/
+  layout.tsx      # top nav: Ask · Alerts · Sources (· Graph if stretch)
+  page.tsx        # Ask
+  alerts/page.tsx # built in P4
+  sources/page.tsx
+components/
+  AskBox.tsx
+  AnswerPanel.tsx
+  WarningBanner.tsx   # stale (amber) / contradiction (red)
+  EvidenceCard.tsx
+  HopPath.tsx
+  FeedbackBar.tsx
+  EvalBadge.tsx       # wired in P4
+```
+
+## Tasks
+
+### Wiring
+- [ ] `lib/types.ts` mirrors the P2 contract exactly
+- [ ] `lib/api.ts`: `fetch` wrappers with a timeout (25 s) and typed errors; mock switch via env
+- [ ] `frontend/.env.local.example`: `NEXT_PUBLIC_API_URL=http://localhost:8000`
+
+### Ask page (`/`)
+- [ ] `AskBox`: input + button, Enter to submit, **3 suggested-question chips** (showcase, refusal, one more multi-hop) that also serve as demo shortcuts
+- [ ] Loading state: skeleton + a "retrieving from graph…" line (queries take about 8 s against Cognee Cloud (P0 S7))
+- [ ] `AnswerPanel`: answer text; if `grounded=false`, a neutral "Not in company knowledge" state (a feature, not an error)
+- [ ] `WarningBanner`: one per warning; amber = stale, red = contradiction
+- [ ] `EvidenceCard`: source-type chip (ADR / Ticket / Meeting), ref, snippet, file path; the colour per source matches the diagram
+- [ ] `HopPath`: horizontal chain of pills `svc-payments → ADR-007 → MTG-0312 → priya → platform` with the rel label on each arrow and a hop count. Pill colour by node type. Wraps on narrow screens.
+- [ ] `FeedbackBar`: 👍/👎 → `POST /feedback`
+- [ ] Error state: backend down or timeout → message + retry button
+
+### Sources page (`/sources`)
+- [ ] Table: ref, type, path, ingested_at, hash (short)
+
+### Styling
+- [ ] Tailwind 4 only; no component library needed
+- [ ] Node-type colours consistent with `architecture.png` (Service blue, Decision amber, Person/Team green, stale red)
+
+### Stretch: graph explorer (`/graph`)
+- [ ] Only if P4 is done early. Consider `react-force-graph-2d` (1 dependency) over `GET /graph?focus=&depth=2`, and highlight the last answer's path.
+
+---
+
+## Acceptance criteria
+- With `NEXT_PUBLIC_USE_MOCK=1`: the full Ask page renders the showcase answer (works before the backend is ready)
+- Against the live backend: the showcase chip → answer, 3 evidence cards, 4-hop path and a stale banner in ≤ 12 s (P0 measured ~8 s p50; the cached fallback covers slower runs)
+- The refusal chip → the "Not in company knowledge" state
+- `npm run lint` and `npm run build` pass
+
+## Exit gate
+End-to-end browser demo of the showcase + refusal against the live API.
+
+## If behind
+Drop `/sources`. `HopPath` can be plain text with arrows. Keep the evidence cards; they are the grounding proof.
