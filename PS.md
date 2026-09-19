@@ -20,3 +20,31 @@
 ## Challenge
 
 **Company Brain** — Build a shared knowledge layer connecting company documents, conversations, tickets, code, and decisions so that humans, agents, and applications can discover both answers and the relationships behind them.
+
+## Evaluation
+
+### Mentoring Round — 03:30 PM – 04:30 PM
+
+**Format:** 5 min pitch + 2 min Q/A
+
+| Criterion | Points |
+|---|---|
+| Problem Clarity | 5 |
+| Design Decisions | 5 |
+| Scalability | 5 |
+| Technical Implementation | 5 |
+| Scope & Prioritisation | 5 |
+| **Total** | **25** |
+
+### Judging Round — 05:00 PM – 06:00 PM
+
+**Format:** 1 min pitch + 2 min project demo + 2 min Q/A
+
+| Criterion | Points |
+|---|---|
+| Production Standards | 5 |
+| Technical Understanding | 5 |
+| System Architecture | 5 |
+| Completeness | 5 |
+| Reliability | 5 |
+| **Total** | **25** |

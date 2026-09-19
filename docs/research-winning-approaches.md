@@ -16,7 +16,56 @@
 
 ---
 
-## 1. What judges reward (verified rubrics)
+## 0. OUR event's actual criteria (from the organizers, see [`PS.md`](../PS.md#evaluation))
+
+| Round | Format | Criteria (5 pts each, /25) |
+|---|---|---|
+| **Mentoring** 3:30–4:30 PM | 5 min pitch + 2 min Q/A | Problem Clarity · Design Decisions · Scalability · Technical Implementation · Scope & Prioritisation |
+| **Judging** 5:00–6:00 PM | **1 min pitch + 2 min demo** + 2 min Q/A | Production Standards · Technical Understanding · System Architecture · Completeness · Reliability |
+
+**How this differs from the Cognee rubrics in section 1:** there is **no "creativity" or "best use of Cognee" score**. 6 of the 10 criteria are engineering-rigor criteria (design decisions, scalability, production standards, architecture, completeness, reliability). This event rewards a **solid, well-reasoned, reliable system** over a flashy idea.
+
+### 0.1 Re-scored against our rubric (/5 each, our assessment)
+
+| Project | Prob. Clarity | Design Dec. | Scal. | Tech Impl. | Scope | **Mentor /25** | Prod. Std. | Tech Und. | Arch. | Complete | Reliab. | **Judge /25** | **Total /50** |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Lethe | 5 | 5 | 3 | 4 | 5 | **22** | 4 | 4 | 4 | 4 | 4 | **20** | **42** |
+| LORE | 5 | 4 | 4 | 4 | 4 | **21** | 4 | 4 | 4 | 4 | 3 | **19** | **40** |
+| Classroom Memory | 4 | 4 | 4 | 4 | 4 | **20** | 4 | 3 | 4 | 4 | 3 | **18** | **38** |
+| RealtyRecall | 4 | 4 | 4 | 4 | 3 | **19** | 4 | 3 | 4 | 4 | 3 | **18** | **37** |
+| Cognee reference pipeline | 5 | 4 | 3 | 4 | 4 | **20** | 2 | 4 | 4 | 3 | 3 | **16** | **36** |
+| ChronoScholar | 4 | 4 | 2 | 4 | 4 | **18** | 2 | 5 | 3 | 3 | 4 | **17** | **35** |
+| DevAtlas | 4 | 3 | 3 | 3 | 3 | **16** | 3 | 3 | 3 | 3 | 2 | **14** | **30** |
+| AI KG for Organizations | 3 | 4 | 4 | 3 | 2 | **16** | 3 | 3 | 4 | 2 | 2 | **14** | **30** |
+
+Rationale in brief:
+- **Lethe** leads because it has one crisp problem ("stale runbook at 3am"), an explicit design decision (forgetting as a feature) and tight scope. Its human-gated audit trail counts as a production standard and a reliability measure. Scalability is its weak spot (single-node file stores).
+- **ChronoScholar** scores highest on Technical Understanding (it documents API pitfalls and token budgets) and gets reliability credit for an actual eval. Scalability and production polish are low.
+- **The reference pipeline** is the right starting point, but it is only a starter. It gets no production-standards credit until we add them.
+
+### 0.2 What each criterion means for our build
+
+| Criterion | What judges will look for | Concrete move |
+|---|---|---|
+| **Problem Clarity** | One user, one painful moment | "New engineer asks why we chose X and who owns it now." Say it in the first 15 s. |
+| **Design Decisions** | *Why* each choice, with trade-offs | A 1-slide decision log: Cognee (graph+vector hybrid) vs plain RAG; SQLite/file stores vs Neo4j (zero infra); GRAPH_COMPLETION vs CHUNKS; node_set per source |
+| **Scalability** | A credible path from demo to org-scale | Incremental ingestion (hash dedupe), `node_set` tenancy, stores swappable by config (LanceDB→pgvector, Kùzu→Neo4j), async ingestion queue. Say what breaks first (LLM extraction cost). |
+| **Technical Implementation** | It actually works end to end | A live ingestion → graph → Q&A path, not mocks |
+| **Scope & Prioritisation** | What you cut and why | Show an explicit "MVP / cut / next" list: 3 sources, 1 multi-hop story; no auth, no connectors beyond files |
+| **Production Standards** | Code quality, config, errors, logging | Env-based config, typed API, error states in the UI, structured logs, README with a one-command setup, a few tests |
+| **Technical Understanding** | Can you explain the internals in Q/A? | Know how GRAPH_COMPLETION works (vector seeds → subgraph → triplets → LLM), why entity resolution matters, token cost per query |
+| **System Architecture** | A clear diagram, clean separation | An ingestion layer / knowledge layer (Cognee) / API / UI diagram, shown in the pitch |
+| **Completeness** | Every PS requirement is visibly met | A checklist slide: ✅ Cognee layer ✅ ≥2 data types ✅ NL Q&A ✅ grounded (evidence shown) ✅ multi-hop (path shown) |
+| **Reliability** | No hallucinations, no demo failure | Answers are always grounded (show the evidence, refuse when there is no context), a small eval (≈10 Qs with expected sources), a **pre-built graph** so the demo never waits on ingestion, retries and a rate-limit-safe LLM tier, a cached fallback for the demo query |
+
+### 0.3 Timing implications
+- **Judging demo is only 2 minutes.** Script **one** question that shows the answer, the evidence and the multi-hop path, plus one "refuses when it doesn't know" question. Pre-ingest everything.
+- **Judging pitch is 1 minute**: problem, architecture diagram, done.
+- **The mentoring pitch (5 min)** is where design decisions, scalability and scope are scored, so prepare the decision log and the cut list for it.
+
+---
+
+## 1. What judges rewarded at other Cognee events (verified rubrics)
 
 ### WeMakeDevs × Cognee "The Hangover Part AI: Where's My Context?" (Jun 29 – Jul 5 2026)
 Source: https://archive.wemakedevs.org/hackathons/cognee (verified 3-0)

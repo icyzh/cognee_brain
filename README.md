@@ -1,17 +1,12 @@
-# Next.js + Hono monorepo
+# Cognee Brain
+
+- `frontend/` — Next.js + React + TypeScript (http://localhost:3000)
+- `backend/` — Python FastAPI (http://localhost:8000, docs at `/docs`)
 
 ## Development
 
 ```bash
-bun run setup
-bun run dev
+bash scripts/init.sh
+cd backend && uv run uvicorn app.main:app --reload --port 8000
+cd frontend && npm run dev
 ```
-
-- Next.js: http://localhost:3000
-- Hono: http://localhost:3002
-
-Run checks with `bun run lint`, `bun run typecheck`, and `bun run build`.
-
-## Google OAuth
-
-Copy `apps/web/.env.example` to `apps/web/.env.local`, then add a unique Auth.js secret and Google OAuth web-client credentials. Register `http://localhost:3000/api/auth/callback/google` as the local authorized redirect URI in Google Cloud.
