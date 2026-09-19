@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS sources (
     ref TEXT NOT NULL,  -- canonical ID, e.g. ADR-007; grounding checks cited refs against this
     type TEXT NOT NULL,
     content_hash TEXT NOT NULL,
-    data_id TEXT,  -- Cognee data_id from /add; maps retrieved chunks back to this file
+    data_id TEXT,  -- Cognee data_id from /add; used to delete/replace this file in Cognee (evidence maps by ref)
     triples_data_id TEXT,  -- data_id of this file's structural triples doc
     ingested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -110,3 +110,21 @@ def reset_ingest_state() -> None:
     with closing(connect()) as conn, conn:
         conn.execute("DELETE FROM sources")
         conn.execute("DELETE FROM aliases")
+
+
+def get_source_by_ref(ref: str) -> sqlite3.Row | None:
+    with closing(connect()) as conn:
+        return conn.execute("SELECT * FROM sources WHERE ref = ? ORDER BY ingested_at DESC", (ref,)).fetchone()
+
+
+def log_qa(question: str, answer: str, response_json: str, grounded: bool, tokens_est: int, latency_ms: int) -> int:
+    with closing(connect()) as conn, conn:
+        return conn.execute(
+            "INSERT INTO qa_log (question, answer, response_json, grounded, tokens_est, latency_ms) VALUES (?, ?, ?, ?, ?, ?)",
+            (question, answer, response_json, int(grounded), tokens_est, latency_ms),
+        ).lastrowid
+
+
+def add_feedback(qa_id: int, helpful: bool, comment: str | None = None) -> None:
+    with closing(connect()) as conn, conn:
+        conn.execute("INSERT INTO feedback (qa_id, helpful, comment) VALUES (?, ?, ?)", (qa_id, int(helpful), comment))

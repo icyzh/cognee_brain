@@ -36,7 +36,7 @@ components/
 
 ### Ask page (`/`)
 - [x] `AskBox`: input + button, Enter to submit, **3 suggested-question chips** (showcase, refusal, one more multi-hop) that also serve as demo shortcuts
-- [x] Loading state: skeleton + a "retrieving from graph…" line (queries take about 8 s against Cognee Cloud (P0 S7))
+- [x] Loading state: skeleton + a "retrieving from graph…" line (queries take 10–13 s against Cognee Cloud (P2 measured))
 - [x] `AnswerPanel`: answer text; if `grounded=false`, a neutral "Not in company knowledge" state (a feature, not an error)
 - [x] `WarningBanner`: one per warning; amber = stale, red = contradiction
 - [x] `EvidenceCard`: source-type chip (ADR / Ticket / Meeting), ref, snippet, file path; the colour per source matches the diagram
@@ -58,7 +58,7 @@ components/
 
 ## Acceptance criteria
 - With `NEXT_PUBLIC_USE_MOCK=1`: the full Ask page renders the showcase answer (works before the backend is ready)
-- Against the live backend: the showcase chip → answer, 3 evidence cards, 4-hop path and a stale banner in ≤ 12 s (P0 measured ~8 s p50; the cached fallback covers slower runs)
+- Against the live backend: the showcase chip → answer, 3 evidence cards, 4-hop path and a stale banner in ≤ 15 s (P2 measured 10–13 s; the cached fallback covers slower runs)
 - The refusal chip → the "Not in company knowledge" state
 - `npm run lint` and `npm run build` pass
 

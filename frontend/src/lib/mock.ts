@@ -24,7 +24,7 @@ export const mockAsk: AskResponse = {
   qa_id: 42,
 };
 
-export const REFUSAL_QUESTION = "What's our Kafka strategy?";
+export const REFUSAL_QUESTION = "What's our mobile release cadence?";
 export const OWNER_QUESTION = "Who decided to move the ledger off MongoDB, and which team owns it?";
 
 // Doubles as the Ask page's demo shortcuts.

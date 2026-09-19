@@ -59,13 +59,13 @@ new doc ingested
    "expect_refs": ["ADR-007", "MTG-0312"], "expect_path_end": "platform", "expect_grounded": true}
   ```
   Mix: 5 multi-hop, 2 single-hop facts, 2 refusals (not in the corpus), 1 stale-decision question
-- [ ] `run_eval.py`: calls the `/ask` pipeline in-process; scores
+- [ ] `run_eval.py`: calls `app.query.ask.ask()` in-process, **after `store.init_db()` and `await paths.refresh()`** (the FastAPI lifespan doesn't run, so without it `path` is always `[]` and no stale warnings fire); eval rows go to `qa_log` too (fine: tagged by question); scores
   - **grounded correct** (matches `expect_grounded`)
   - **ref recall** (expected refs ⊆ evidence refs)
   - **hallucinated sources** (evidence refs not in `sources`), which must be 0
   - **path end correct**
   → writes a summary + per-question rows to `eval_runs`
-- [ ] **Baseline comparison** (`run_eval.py --baseline`): the same 10 questions through **raw Cognee** (`/search` GRAPH_COMPLETION, `includeReferences: true`, no guard / supersede / path layers), scored the same way; plus **stale flagged** (does the answer mark ADR-003 as superseded?) and **refused** (does it decline out-of-corpus questions?). Raw refs = `data_id`s mapped through `sources`. Stored as `eval_runs.variant = 'raw_cognee'` vs `'decision_brain'`
+- [ ] **Baseline comparison** (`run_eval.py --baseline`): the same 10 questions through **raw Cognee** (`cognee_client.ask(q, system_prompt=None)`: Cognee's default prompt, no NOT_FOUND rule, no guard / supersede / path layers), scored the same way; plus **stale flagged** (does the answer mark ADR-003 as superseded?) and **refused** (does it decline out-of-corpus questions?). Raw refs = chunk `source_ref` (TextDocument name) → `sources` by ref. Stored as `eval_runs.variant = 'raw_cognee'` vs `'decision_brain'`
   → answers "isn't this just a Cognee wrapper?" with numbers, not claims
 - [ ] `GET /eval/latest` → `{decision_brain: {run_at, grounded_ok: 9, total: 10, hallucinated_sources: 0, ref_recall: 0.93, stale_flagged: 1}, raw_cognee: {…same fields…}}`
 
@@ -77,7 +77,7 @@ new doc ingested
 ## 4D: Agent access (PS-2: "humans, agents, and applications")
 `/ask` is already the application API; this makes the same brain usable by an agent, with no new logic.
 
-- [ ] `backend/mcp_server.py`: `uv add mcp`, one `FastMCP` stdio server with one tool, `ask_company_brain(question) -> dict`, that POSTs to `http://localhost:8000/ask` and returns the response unchanged (answer, evidence, path, warnings)
+- [ ] `backend/mcp_server.py`: `uv add mcp`, one `FastMCP` stdio server with one tool, `ask_company_brain(question) -> dict`, that POSTs to `http://localhost:8000/ask` (httpx timeout ≥ 45 s: `/ask` takes 10–13 s, up to ~42 s with the retry) and returns the response unchanged (answer, evidence, path, warnings)
 - [ ] `.mcp.json` at the repo root registering it (`uv run --directory backend python mcp_server.py`), so Claude Code / any MCP client picks it up
 - [ ] README: a 3-line "Use from an agent" section
 

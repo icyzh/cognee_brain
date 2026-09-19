@@ -205,7 +205,7 @@ flowchart LR
     K -- about_topic --> TOP
 ```
 
-Cognee Cloud has no REST route for custom `DataPoint`s (`add_data_points` is in-process only; spike S3). Structural edges are therefore sent as canonical text triples into `/add` (`node_set=structural`), and P1 checks that every expected edge exists in `GET /datasets/{id}/graph`. A `/cognify` `graphModel` JSON schema can type the nodes if needed. Citations come from the `DocumentChunk` behind each retrieved triplet: `/add` returns a `data_id` per file, which `app.db` `sources` maps back to the seed file.
+Cognee Cloud has no REST route for custom `DataPoint`s (`add_data_points` is in-process only; spike S3). Structural edges are therefore sent as canonical text triples into `/add` (`node_set=structural`), and P1 checks that every expected edge exists in `GET /datasets/{id}/graph`. A `/cognify` `graphModel` JSON schema can type the nodes if needed. Citations come from the `DocumentChunk`s in the search result: each chunk's `TextDocument` is named after our upload filename (the ref, e.g. `ADR-007`), which `app.db` `sources.ref` maps back to the seed file. Chunks from triples docs are not used as evidence.
 
 `cognify` also creates its own node types alongside ours: `TextDocument`, `DocumentChunk`, `TextSummary`, `Entity`, `EntityType` and `NodeSet` (spike S9). The graph explorer should hide or dim them.
 
@@ -230,21 +230,20 @@ sequenceDiagram
     U->>FE: Why is payments on Postgres, and who should I talk to about it now?
     FE->>API: POST /ask {question}
     API->>R: retrieve(question)
-    R->>C: POST /search {searchType: GRAPH_COMPLETION, verbose: true, sessionId: fresh}
+    R->>C: POST /search {searchType: GRAPH_COMPLETION, verbose: true, sessionId: fresh, systemPrompt: cite IDs or NOT_FOUND}
     C->>G: embed query, vector top-k to seed nodes
     G-->>C: seed nodes
     C->>G: project subgraph around seeds, rank triplets
     G-->>C: triplets and chunks
     C->>L: answer from context only
     L-->>C: answer text
-    C-->>R: text_result + context_result + objects_result triplets
-    R->>GG: check context
-    alt no relevant context
+    C-->>R: text_result + objects_result (chunks → TextDocument name = source ref)
+    R->>GG: NOT_FOUND? empty context? any evidence ref in sources?
+    alt not grounded
         GG-->>API: refuse: not in company knowledge
     else grounded
-        GG->>SC: decisions in path
-        SC->>G: any incoming supersedes edge?
-        G-->>SC: ADR-003 superseded by ADR-007
+        GG->>SC: path = weighted shortest path over metadata triples ∩ graph edges
+        SC->>SC: supersedes from ADR frontmatter (cached): ADR-003 superseded by ADR-007
         SC-->>API: answer + evidence + path + stale warnings
     end
     API->>DB: log question, answer, latency, sources
@@ -272,7 +271,7 @@ Frozen in [phase-2](phases/phase-2-query-pipeline.md#contract-frozen-at-the-star
     {"from": {"id": "priya", "type": "Person"}, "rel": "member_of", "to": {"id": "platform", "type": "Team"}}
   ],
   "warnings": [
-    {"kind": "stale", "node": "ADR-003", "message": "ADR-003 (MongoDB) superseded by ADR-007 on 2026-03-12"}
+    {"kind": "stale", "node": "ADR-003", "message": "ADR-003 (Use MongoDB for the payments ledger) superseded by ADR-007 on 2026-03-12"}
   ],
   "latency_ms": 7900,
   "qa_id": 42
@@ -339,10 +338,10 @@ flowchart TB
 
 | Risk | Mitigation |
 |---|---|
-| Hallucinated answer | Answer only from retrieved context, refuse when there is none, always return evidence |
+| Hallucinated answer | Answer only from retrieved context; refuse on the NOT_FOUND sentinel or when no cited source exists in `sources`; always return evidence |
 | Broken multi-hop path | Demo path runs over **structural edges generated from metadata and verified after cognify**, and canonical IDs avoid entity-resolution errors |
 | Ingestion slow or failing live | Graph built before the demo and left untouched; content-hash dedupe makes re-ingest idempotent |
-| Cognee Cloud rate limits or slow queries (~8 s p50) | Tenant-managed model, retries with backoff, cached fallback for the scripted query |
+| Cognee Cloud rate limits or slow queries (10–13 s per /ask) | Tenant-managed model, retries with backoff, cached fallback for the scripted query |
 | Cognee API drift | Pinned version in `uv.lock`, with a thin `app/cognee_client.py` wrapper as the single integration point |
 | Stale knowledge | `supersedes` edges produce warnings in the answer |
 
@@ -378,7 +377,7 @@ backend/
       align.py              # alias index, missing_edges, canonical /graph view
     query/
       ask.py                # retrieve -> guard -> supersede -> path
-      paths.py              # BFS over align.canonical_edges(graph_dump()) -> path[]
+      paths.py              # weighted shortest path over metadata triples ∩ graph edges -> path[]
     store.py                # sqlite3 app.db (sources, aliases, history, feedback, alerts, eval)
   tests/test_ingest.py      # offline checks: uv run python -m tests.test_ingest
   eval/

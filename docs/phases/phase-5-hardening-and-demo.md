@@ -47,7 +47,7 @@ Production standards, architecture, completeness (PS checklist), reliability (ev
 | How does it scale? | Dedicated Cognee Cloud tenant, or self-hosted Cognee with Neo4j/pgvector; ingest is incremental by hash; `node_set` per team for access; the bottleneck is LLM extraction cost, kept low because structural edges are short canonical triples |
 | How do you prevent hallucinations? | Grounded-or-refuse guard in code, evidence only from ingested sources, 0 hallucinated sources in eval |
 | Contradiction false positives? | Candidates are bounded to active decisions on the same service; the LLM judge has a confidence threshold; tested with a non-conflicting doc |
-| Cost per query? | ~8 s per graph query (P0); tokens are billed on the tenant, measure via `/api/v1/sessions/cost-by-model`; cached embeddings |
+| Cost per query? | 10–13 s per /ask (P2); tokens are billed on the tenant, measure via `/api/v1/sessions/cost-by-model`; cached embeddings |
 
 ## Rehearsal
 - [ ] Run the [demo script](../plan.md#7-demo-script-2-minutes-judging-round) **3 times clean** from `restore_demo.sh`
