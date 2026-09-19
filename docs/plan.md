@@ -50,18 +50,20 @@ A fictional company, **Snow Pay**, with **canonical IDs shared across every sour
 ### 2.3 Backend track: `backend/app/` (FastAPI, uv, stdlib `sqlite3`)
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | liveness, cognee config, graph stats |
+| `GET /health` | liveness, Cognee config, `graph {nodes, verified_edges}`, `last_eval`, `ingest_building` (pre-demo check) |
 | `POST /ingest` | batch (seed dir) → stats; or multipart upload (live demo) → `{source_ref, alerts[], graph_status, took_ms}` in ~8 s, graph builds in the background |
 | `GET /ingest/status` | `{building}` while a live upload's graph is being built |
-| `POST /ask` | `{question}` → `{answer, evidence[], path[], warnings[], grounded, latency_ms, qa_id}`; `?raw=true` = plain Cognee for the side-by-side |
+| `POST /ask` | `{question}` → `{answer, evidence[], path[], warnings[], grounded, latency_ms, qa_id}` + optional `cached`, `experts[]`, `unsupported_citations[]`; `?raw=true` = plain Cognee for the side-by-side |
+| `GET /history` | recent grounded answers, one per question (Ask page start state) |
+| `GET /timeline?service=&as_of=` | decision history of a service: validity intervals, what was in force on a date, open contradiction proposals |
 | `GET /graph` | nodes and edges for the explorer (optional `?focus=<id>&depth=2`) |
 | `GET /graph/cognee` | Cognee's own rendered graph page, proxied (keeps the API key server-side) |
 | `GET /sources` | every ingested item with hash, type and time |
 | `GET /alerts` | contradictions and stale decisions |
 | `POST /feedback` | `{qa_id, helpful, comment?}` |
-| `GET /eval/latest` | latest eval run per variant: ours vs raw Cognee |
+| `GET /eval/latest` | latest eval run per variant: ours, Cognee + our prompt (ablation), raw Cognee |
 
-Modules: `query/ask.py` (retrieve → guard → supersede → path), `query/paths.py`, `analysis/contradictions.py`, `store.py` (app.db).
+Modules: `query/ask.py` (retrieve → guard → supersede → path), `query/paths.py`, `analysis/contradictions.py`, `analysis/timeline.py`, `store.py` (app.db), `logs.py` (JSON lines).
 
 `app.db` tables: `sources`, `aliases`, `qa_log`, `feedback`, `alerts`, `eval_runs`.
 

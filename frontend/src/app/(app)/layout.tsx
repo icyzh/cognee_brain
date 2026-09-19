@@ -11,7 +11,7 @@ import { ThemeToggle } from "../theme-toggle";
 const NAV = [
   { href: "/ask", label: "Ask", icon: ICON.ask, sub: "Answers with evidence and the path behind them" },
   { href: "/alerts", label: "Alerts", icon: ICON.alert, sub: "Contradictions and stale decisions, checked on every ingest" },
-  { href: "/sources", label: "Sources", icon: ICON.sources, sub: "Every file in the knowledge graph" },
+  { href: "/sources", label: "Data", icon: ICON.sources, sub: "Add company docs and see every file in the knowledge graph" },
   { href: "/graph", label: "Graph", icon: ICON.graph, sub: "Entities and links in Cognee" },
 ];
 

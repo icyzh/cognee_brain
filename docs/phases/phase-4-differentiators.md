@@ -20,7 +20,7 @@ new doc ingested
 ```
 
 ### Backend / Cognee tasks: `backend/app/analysis/contradictions.py`
-- [x] `extract_claims(doc) -> list[Claim{service_id, text, source_ref}]` (frontmatter `proposals` / `decisions` only; LLM fallback deferred)
+- [x] `extract_claims(doc) -> list[Claim{service_id, text, source_ref}]` (frontmatter `proposals` / `decisions` first; LLM fallback for docs without them: one extraction call, known service IDs only)
 - [x] `candidates(service_id) -> list[Decision]` from the structural graph (active only)
 - [x] `judge(claim, decision) -> Verdict`: one direct OpenAI call (`httpx` → `/v1/chat/completions`, `LLM_MODEL` + `LLM_API_KEY` from `.env`; Cognee Cloud's model is hidden behind its proxy, so the judge uses a model we can name and pin), default temperature (gpt-5.6-luna rejects 0), JSON output, uploaded text fenced in `<document>` against prompt injection; prompt includes both texts and asks for a one-sentence reason
 - [x] Persist to `alerts` (`kind='contradiction', new_ref, existing_ref, service, reason, confidence, created_at`) (app.db only; P0 S3: no custom graph edges in Cognee Cloud)

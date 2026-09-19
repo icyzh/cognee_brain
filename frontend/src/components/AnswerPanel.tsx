@@ -45,6 +45,7 @@ export function AnswerPanel({ res }: { res: AskResponse }) {
           action={
             <div className="flex items-center gap-3">
               {seconds(res.latency_ms)}
+              {res.cached && <Pill>cached answer</Pill>}
               <Pill tone="green">
                 <Icon d={ICON.check} className="size-3" />
                 Grounded

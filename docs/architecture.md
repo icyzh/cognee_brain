@@ -1,11 +1,49 @@
 # Permafrost: Technical Architecture
 
-A mini Company Brain on **Cognee**. It ingests docs, tickets and meeting notes into a hybrid graph+vector knowledge layer and answers natural-language questions with **evidence** and a **visible multi-hop path**.
+A mini Company Brain built as a **verification harness over Cognee**: Cognee remembers; the harness checks, time-stamps and measures what it remembers. It ingests docs, tickets and meeting notes into a hybrid graph+vector knowledge layer and answers natural-language questions with **evidence** and a **visible multi-hop path**.
 
 > **Full diagram:** [`architecture.excalidraw`](architecture.excalidraw) (open at excalidraw.com), with a PNG preview at [`architecture.png`](architecture.png).
 >
 > **Excalidraw:** every diagram below is a Mermaid `flowchart` or `sequenceDiagram`, the two types Excalidraw's converter supports. In Excalidraw, open **More tools → Mermaid to Excalidraw** and paste a block.
 > Cognee APIs were confirmed in the Phase 0 spike ([phase-0](phases/phase-0-setup-and-spike.md), S1–S9) against **Cognee Cloud** REST (`/api/v1/*`), using SDK 1.6.0 for reference.
+
+---
+
+## The harness at a glance
+
+A wrapper forwards calls. A harness constrains, checks and measures the engine inside it, and **rejects its output when a check fails**. Cognee is the engine (purple); every green step is ours. Workflow picture: [`workflow.png`](workflow.png) ([source](workflow.excalidraw)).
+
+```mermaid
+flowchart LR
+    IN["Company data"] --> SPLIT["Split: metadata → triples, prose → text"]
+    SPLIT --> COG["Cognee: cognify, graph + vectors"]
+    COG --> H1["H1 Verify edges"]
+    Q["Question"] --> SEARCH["Cognee: GRAPH_COMPLETION"]
+    SEARCH --> H2["H2 Grounding guard"]
+    H2 --> H3["H3 Verified hop path + people to ask"]
+    H1 -.->|"only verified edges"| H3
+    H3 --> H4["H4 Truth check: stale, contradiction, timeline"]
+    H4 --> OUT["Answer + evidence + path + warnings"]
+    DOC["New doc"] --> H5["H5 Contradiction check"]
+    H5 -.->|"alerts"| H4
+    EVAL["H6 Eval: harness vs Cognee + prompt vs raw Cognee"] -.-> SEARCH
+
+    classDef cognee fill:#ddd6fe,stroke:#6d28d9,color:#374151
+    classDef ours fill:#a7f3d0,stroke:#047857,color:#374151,stroke-width:3px
+    class COG,SEARCH cognee
+    class H1,H2,H3,H4,H5,H6 ours
+```
+
+| # | Harness checkpoint | What it checks | When the check fails | Code |
+|---|---|---|---|---|
+| H1 | Verify edges | Every metadata triple must exist in Cognee's graph (`metadata ∩ graph`) | Showcase edge missing → one retry, then **ingest fails**. LLM-invented edges between canonical nodes (seen: "ADR-007 affects svc-reports") never enter a path | `ingest/__main__.py:SHOWCASE`, `ingest/align.py:missing_edges`, `query/paths.py:refresh` |
+| H2 | Grounding guard | Context retrieved, no refusal wording, a cited ID is a real retrieved source | **Refuse**: "not in company knowledge". Cited-but-not-retrieved IDs are reported in `unsupported_citations[]` | `query/ask.py:grounding_guard`, `evidence`, `unsupported_citations` |
+| H3 | Verified hop path, people to ask | Deterministic weighted shortest path and Personalized PageRank, both over verified edges only | No verified route → `path: []` (never an LLM-made path) | `query/paths.py:best_path`, `rank_people` |
+| H4 | Truth check | Cited decision superseded? contradicted by a newer doc? which decision was in force on a date? | `warnings[]` attached in code after retrieval, so the answer text cannot skip them | `query/ask.py:supersede_check`, `analysis/timeline.py` |
+| H5 | Contradiction check | New doc's claims (frontmatter, else one LLM extraction) vs **active decisions on the same service** only, one LLM judge call per pair, confidence ≥ 0.7 | Alert raised in ~8 s, before the graph finishes building | `analysis/contradictions.py` |
+| H6 | Eval | Same 10 questions through the harness, through Cognee + our prompt (no harness), and through raw Cognee | Numbers shown in the UI; the ablation row separates what the prompt buys from what the code buys | `eval/run_eval.py`, `GET /eval/latest` |
+
+The boundary is one file: `backend/app/cognee_client.py` is the only module that talks to Cognee. H3's ranking, H4's timeline and H5's candidate selection make no Cognee calls at all.
 
 ---
 
@@ -34,6 +72,7 @@ flowchart LR
         B3["GET /graph"]
         B4["GET /sources"]
         B5["POST /feedback"]
+        B6["GET /alerts"]
         subgraph ING["Ingestion service"]
             I1["Loaders and normalizer"]
             I2["Structural edge builder"]
@@ -44,6 +83,11 @@ flowchart LR
             Q2["Grounding guard"]
             Q3["Supersede checker"]
             Q4["Path extractor"]
+        end
+        subgraph CON["Contradiction check (live upload)"]
+            X1["Claims from frontmatter"]
+            X2["Active decisions on the same service"]
+            X3["LLM judge, confidence ≥ 0.7"]
         end
     end
 
@@ -93,6 +137,12 @@ flowchart LR
     Q4 --> F3
     B5 --> A1
     B2 --> A1
+    B1 --> X1
+    X1 --> X2
+    X2 --> X3
+    X3 --> A1
+    B6 --> A1
+    X3 -.-> OAI["OpenAI judge model (ours)"]
 
     C2 -.-> LLM
     C4 -.-> LLM
@@ -104,8 +154,8 @@ flowchart LR
 |---|---|---|
 | Data | `data/seed/` | One consistent fictional company with 30–50 items and **canonical IDs** shared across sources |
 | Frontend | Next.js App Router | Ask UI, evidence cards, hop-path rendering, graph explorer |
-| Backend | FastAPI | HTTP API, ingestion orchestration, query pipeline, grounding rules |
-| Knowledge | Cognee | Graph + vector memory, LLM extraction, graph-completion retrieval |
+| Backend | FastAPI (**the harness**, H1–H6 above) | HTTP API, ingestion orchestration, query pipeline, grounding rules |
+| Knowledge | Cognee (the engine inside the harness) | Graph + vector memory, LLM extraction, graph-completion retrieval |
 | Stores | Cognee Cloud tenant | Managed graph, vector and relational stores, reached over REST |
 | App state | `app.db` (stdlib `sqlite3`) | Ingested sources (hash, Cognee data_ids), aliases, Q&A history, feedback, alerts, eval runs |
 | Model | Cognee Cloud tenant | LLM and embeddings are configured on the tenant, not in our `.env` |
@@ -254,7 +304,7 @@ sequenceDiagram
 
 ### `/ask` response contract
 
-Frozen in [phase-2](phases/phase-2-query-pipeline.md#contract-frozen-at-the-start-of-this-phase-frontend-builds-against-it); typed in `frontend/src/lib/types.ts`.
+Frozen in [phase-2](phases/phase-2-query-pipeline.md#contract-frozen-at-the-start-of-this-phase-frontend-builds-against-it); typed in `frontend/src/lib/types.ts`. Optional fields added later: `cached: true` (served from the last grounded answer when the live call fails or takes > 20 s), `experts[]` (people ranked over verified edges), `unsupported_citations[]` (IDs the answer cites that weren't in the retrieved context). `warnings[].kind` is `stale` or `contradiction`.
 
 ```json
 {
@@ -274,7 +324,7 @@ Frozen in [phase-2](phases/phase-2-query-pipeline.md#contract-frozen-at-the-star
   "warnings": [
     {"kind": "stale", "node": "ADR-003", "message": "ADR-003 (Use MongoDB for the payments ledger) superseded by ADR-007 on 2026-03-12"}
   ],
-  "latency_ms": 7900,
+  "latency_ms": 11800,
   "qa_id": 42
 }
 ```
@@ -382,19 +432,21 @@ backend/
       paths.py              # weighted shortest path over metadata triples ∩ graph edges -> path[]
     analysis/contradictions.py  # claims → same-service active candidates → OpenAI judge → alerts
     store.py                # sqlite3 app.db (sources, aliases, history, feedback, alerts, eval)
-  tests/                    # offline checks: uv run python -m tests.<test_ingest|test_ask|test_contradictions>
-  eval/                     # questions.json + run_eval.py [--baseline]
-  mcp_server.py             # MCP stdio tool ask_company_brain → POST /ask (registered in /.mcp.json)
+    logs.py                 # JSON-lines logs with a per-request id
+    analysis/timeline.py    # decision history of a service (GET /timeline)
+  tests/                    # offline checks: uv run python -m tests.<test_ingest|test_ask|test_contradictions|test_timeline>
   eval/
-    questions.json          # 10 Qs + expected sources/path
-    run_eval.py
+    questions.json          # 10 Qs + expected refs / path / stale
+    run_eval.py             # [--baseline [raw|prompted]]: ours vs Cognee (+ our prompt) vs raw Cognee
+  mcp_server.py             # MCP stdio tool ask_company_brain → POST /ask (registered in /.mcp.json)
+scripts/
+  init.sh  dev.sh  restore_demo.sh   # setup · both servers · demo reset [save]
 frontend/
   src/app/
     page.tsx                # landing
     (app)/ask/ graph/ sources/ alerts/   # app pages
   src/components/
-    EvidenceCard.tsx
-    HopPath.tsx
+    AnswerPanel.tsx  EvidenceCard.tsx  HopPath.tsx  EvalBadge.tsx  Timeline.tsx  GraphCanvas.tsx
 data/
   seed/  adrs/  tickets/  meetings/  team.json  README.md (story bible)
   live/  MTG-0402.md        # not pre-ingested; P4 demo trigger

@@ -36,6 +36,7 @@ export interface AskResponse {
   unsupported_citations?: string[]; // IDs the answer cites that were not in the retrieved context
   latency_ms: number;
   qa_id: number;
+  cached?: boolean; // served from the last grounded answer because the live call failed or took > 20 s
 }
 
 // GET /sources row (backend/app/store.py `sources` table)
@@ -58,6 +59,17 @@ export interface Alert {
   confidence: number | null;
   created_at: string;
   people?: string[];
+}
+
+// POST /ingest with no file: batch re-ingest of data/seed (unchanged files skipped)
+export interface SeedIngestResult {
+  files: number;
+  ingested: number;
+  skipped: number;
+  nodes: number;
+  edges: number;
+  showcase_missing: [string, string, string][];
+  took_s: number;
 }
 
 // POST /ingest (multipart, one file), docs/phases/phase-4-differentiators.md §4B

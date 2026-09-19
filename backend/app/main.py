@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import sqlite3
 import time
 import uuid
@@ -41,18 +42,11 @@ async def _refresh_paths() -> None:
 
 app = FastAPI(title="Cognee Brain API", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 @app.middleware("http")
 async def request_log(request: Request, call_next):
     """One JSON line per request (id, endpoint, status, latency); /ask adds grounded + tokens itself."""
-    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    rid = re.sub(r"[^A-Za-z0-9-]", "", request.headers.get("x-request-id", ""))[:64] or uuid.uuid4().hex[:12]
     request_id.set(rid)
     t0 = time.perf_counter()
     try:
@@ -64,6 +58,17 @@ async def request_log(request: Request, call_next):
     jlog("request", method=request.method, path=request.url.path, status=response.status_code,
          latency_ms=round((time.perf_counter() - t0) * 1000))
     return response
+
+
+# Added after the logging middleware = outermost, so even its catch-all 500 carries CORS headers
+# (otherwise the browser hides the {error, retryable} body behind a network error).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["x-request-id"],
+)
 
 
 @app.get("/health")
@@ -209,14 +214,17 @@ async def ask(req: AskRequest, raw: bool = False):
     Cognee error the last answer is served, flagged `cached: true` (and logged), never hidden.
     """
     fallback = None if raw else ask_pipeline.cached(req.question)
+    t0 = time.perf_counter()
     try:
         if raw:
             return await ask_pipeline.ask_raw(req.question)
         return await asyncio.wait_for(ask_pipeline.ask(req.question), 20 if fallback else None)
-    except (TimeoutError, httpx.HTTPError, RuntimeError) as e:
-        if fallback:
+    except Exception as e:
+        if fallback:  # any failure, not just Cognee errors: the demo question still answers
             jlog("ask_fallback", reason=repr(e), qa_id=fallback.get("qa_id"))
-            return fallback
+            return fallback | {"latency_ms": round((time.perf_counter() - t0) * 1000)}  # the real wait
+        if not isinstance(e, (TimeoutError, httpx.HTTPError, RuntimeError)):
+            raise
         if isinstance(e, (TimeoutError, httpx.TimeoutException)):
             raise HTTPException(504, {"error": "knowledge layer timed out", "retryable": True}) from e
         if isinstance(e, httpx.HTTPError):  # connect / transport errors

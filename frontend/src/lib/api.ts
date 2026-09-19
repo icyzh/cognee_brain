@@ -10,7 +10,17 @@ import {
   mockSources,
   mockTimeline,
 } from "./mock";
-import type { Alert, AskResponse, EvalLatest, GraphData, HistoryItem, IngestResult, Source, TimelineData } from "./types";
+import type {
+  Alert,
+  AskResponse,
+  EvalLatest,
+  GraphData,
+  HistoryItem,
+  IngestResult,
+  SeedIngestResult,
+  Source,
+  TimelineData,
+} from "./types";
 
 export const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -81,6 +91,21 @@ export async function ingestFile(file: File): Promise<IngestResult> {
   const body = new FormData();
   body.append("file", file);
   return request("/ingest", body, 60_000);
+}
+
+// Is a live upload's graph still building? The backend takes one ingest at a time (409 meanwhile).
+export async function ingestStatus(): Promise<{ building: boolean }> {
+  if (USE_MOCK) return { building: false };
+  return request("/ingest/status");
+}
+
+// Re-ingest data/seed: unchanged files are skipped (seconds); changed ones take minutes (cognify).
+export async function ingestSeed(): Promise<SeedIngestResult> {
+  if (USE_MOCK) {
+    await delay(1500);
+    return { files: 33, ingested: 0, skipped: 33, nodes: 453, edges: 1928, showcase_missing: [], took_s: 1.5 };
+  }
+  return request("/ingest", new FormData(), 600_000); // empty multipart = batch mode
 }
 
 export async function evalLatest(): Promise<EvalLatest> {

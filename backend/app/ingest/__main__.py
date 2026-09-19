@@ -142,6 +142,7 @@ async def ingest_file(path: Path, dataset: str = COGNEE_DATASET) -> tuple[dict, 
 async def forget(path: Path, dataset: str = COGNEE_DATASET) -> None:
     """Undo an ingest (demo reset, P5): drop the file's Cognee data, sources row and alerts; keep the file.
     A running server keeps its cached path edges until the next ingest or restart."""
+    store.init_db()
     recs = loaders.load(path) if Path(path).exists() else []
     if not recs:
         raise SystemExit(f"{path}: not found or not a recognised document")

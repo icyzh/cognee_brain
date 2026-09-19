@@ -36,6 +36,7 @@ def test_threshold_and_cap():
     saved = []
     contradictions.judge = fake_judge
     contradictions.store.add_alert = lambda *a: saved.append(a) or {"existing_ref": a[2]}
+    contradictions.store.clear_contradictions = lambda ref: None  # never touch the real app.db from a test
     alerts = asyncio.run(contradictions.check(LIVE, RECORDS))
     assert sorted(calls) == ["ADR-002", "ADR-006", "ADR-007", "ADR-008"]
     assert [a["existing_ref"] for a in alerts] == ["ADR-007"]  # 0.5 < THRESHOLD: no alert

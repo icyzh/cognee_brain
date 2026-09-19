@@ -7,22 +7,22 @@
 ---
 
 ## Reliability (Backend + Cognee)
-- [ ] **Demo reset:** after the final seed ingest, freeze the `snow` dataset (no more re-ingest) and back up `app.db` → `snapshots/demo/`; `scripts/restore_demo.sh` runs `uv run python -m app.ingest --forget ../data/live/MTG-0402.md` (MTG-0402 lives in the same `snow` dataset) and restores `app.db`
-- [ ] **Cached fallback:** answers for the 3 scripted questions stored in `app.db`. If the live call fails or takes > 20 s, serve the cache (flagged `cached: true` in the logs, not hidden from Q&A if asked)
-- [ ] Retries with backoff on Cognee Cloud 429/5xx; clear error JSON (`{error, retryable}`), no stack traces to the client
-- [ ] Structured logs (JSON lines): request id, endpoint, latency, tokens, grounded
-- [ ] `GET /health` reports graph node and edge counts and the last eval score (a quick pre-demo check)
-- [ ] Pin: `uv.lock` committed, `package-lock.json` committed, `COGNEE_*` vars in `.env.example` (models are tenant-managed)
+- [x] **Demo reset:** after the final seed ingest, freeze the `snow` dataset (no more re-ingest) and back up `app.db` → `snapshots/demo/`; `scripts/restore_demo.sh` runs `uv run python -m app.ingest --forget ../data/live/MTG-0402.md` (MTG-0402 lives in the same `snow` dataset) and restores `app.db`
+- [x] **Cached fallback:** the last *grounded* answer to any question asked before (so the scripted ones) is kept in `app.db` (`qa_log`). If the live call fails or takes > 20 s, serve the cache (flagged `cached: true` in the logs, not hidden from Q&A if asked)
+- [x] Retries with backoff on Cognee Cloud 429/5xx; clear error JSON (`{error, retryable}`), no stack traces to the client
+- [x] Structured logs (JSON lines): request id, endpoint, latency, tokens, grounded
+- [x] `GET /health` reports graph node and edge counts and the last eval score (a quick pre-demo check)
+- [x] Pin: `uv.lock` committed, `package-lock.json` committed, `COGNEE_*` vars in `.env.example` (models are tenant-managed)
 
 ## Production standards (All)
-- [ ] `backend`: type hints, `ruff check` clean, the test modules pass (`uv run python -m tests.test_ingest` etc.; plain asserts, no pytest dependency)
-- [ ] `frontend`: `npm run lint` + `npm run build` pass; no console errors
-- [ ] No secrets in the repo; `.env.example` for both apps
-- [ ] `scripts/init.sh` → one command to set up; `scripts/dev.sh` runs both servers
+- [x] `backend`: type hints, `ruff check` clean, the test modules pass (`uv run python -m tests.test_ingest` etc.; plain asserts, no pytest dependency)
+- [x] `frontend`: `npm run lint` + `npm run build` pass; no console errors
+- [x] No secrets in the repo; `.env.example` for both apps
+- [x] `scripts/init.sh` → one command to set up; `scripts/dev.sh` runs both servers
 
 ## Docs (Quality)
-- [ ] `README.md`: problem (2 lines), architecture image (`docs/architecture.png`), quickstart (3 commands), demo script, eval result, decision log (link to `plan.md §4`), cut list
-- [ ] Update `docs/architecture.md` and the diagram: add contradiction detection (P4) and remove the resolved ⚠️ markers
+- [x] `README.md`: problem (2 lines), architecture image (`docs/architecture.png`), quickstart (3 commands), demo script, eval result, decision log (link to `plan.md §4`), cut list
+- [x] Update `docs/architecture.md` and the diagram: add contradiction detection (P4) and remove the resolved ⚠️ markers
 
 ## Pitch material
 ### Slides (max 6)
@@ -47,17 +47,27 @@ Production standards, architecture, completeness (PS checklist), reliability (ev
 | How does it scale? | Dedicated Cognee Cloud tenant, or self-hosted Cognee with Neo4j/pgvector; ingest is incremental by hash; `node_set` per team for access; the bottleneck is LLM extraction cost, kept low because structural edges are short canonical triples |
 | How do you prevent hallucinations? | Grounded-or-refuse guard in code, evidence only from ingested sources, 0 hallucinated sources in eval |
 | Contradiction false positives? | Candidates are bounded to active decisions on the same service; the LLM judge has a confidence threshold; tested with a non-conflicting doc |
-| Cost per query? | 10–13 s per /ask (P2); tokens are billed on the tenant, measure via `/api/v1/sessions/cost-by-model`; cached embeddings |
+| Cost per query? | 10–16 s per /ask; tokens are billed on the tenant, measure via `/api/v1/sessions/cost-by-model`; cached embeddings |
 
 ## Rehearsal
-- [ ] Run the [demo script](../plan.md#7-demo-script-2-minutes-judging-round) **3 times clean** from `restore_demo.sh`
-- [ ] Time it: ≤ 2:00
-- [ ] Record a backup screen video of one clean run
-- [ ] Pre-demo checklist: backend up, `/health` green, `uv run python -m app.ingest --forget ../data/live/MTG-0402.md` run (so the live drop is fresh), snapshot restored, browser zoom 125%, notifications off, MTG-0402 file on the desktop
+- [x] Run the [demo script](../plan.md#7-demo-script-2-minutes-judging-round) **3 times clean** from `restore_demo.sh` (done at API level; a browser run is part of the owner checklist)
+- [x] Time it: ≤ 2:00
+- [ ] **(owner)** Record a backup screen video of one clean run
+- [ ] **(owner)** Pre-demo checklist: backend up, `/health` green, `uv run python -m app.ingest --forget ../data/live/MTG-0402.md` run (so the live drop is fresh), snapshot restored, browser zoom 125%, notifications off, MTG-0402 file on the desktop
 
 ## 4:30–5:00 (after mentoring)
-- [ ] Apply only **small**, low-risk mentor feedback (copy, UI emphasis, slide order)
-- [ ] Re-run eval + one rehearsal → freeze
+- [ ] **(owner)** Apply only **small**, low-risk mentor feedback (copy, UI emphasis, slide order)
+- [ ] **(owner)** Re-run eval + one rehearsal → freeze
+
+## Results (2026-09-19)
+| Check | Result |
+|---|---|
+| Rehearsal (API, steps 1–5, from `restore_demo.sh`) | 3/3 correct: 4-hop path + stale, refusal, alert vs ADR-007 (0.99), re-ask with contradiction, eval 10 vs 9. API time 44–55 s per run, leaving ~65 s of the 2:00 for narration |
+| Rehearsal finding | run 3 (first rehearsal) lost the contradiction warning on the re-ask: the answer's wording didn't cite ADR-007. Warnings now also match the alert's **service** |
+| Cached fallback | Cognee unreachable: showcase served from cache (`cached: true`, pill in the UI) in 9 ms; uncached question → `502 {error, retryable}` |
+| `/health` | graph 453 nodes / 125 verified edges, last eval 10/10, path 5/5 |
+| Checks | ruff clean; `tests.test_ingest` / `test_ask` / `test_contradictions` / `test_timeline` pass (scratch `APP_DB`); frontend lint + `npm run build` pass |
+| Pitch deck | 6 slides with speaker notes (Q&A answers), a separate artifact |
 
 ## Acceptance criteria
 - Clean rehearsal ×3; backup video exists; README quickstart works on a fresh clone
