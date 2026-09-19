@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-(cd backend && uv run uvicorn app.main:app --reload --port 8000) &
-BACKEND=$!
-trap 'kill $BACKEND 2>/dev/null' EXIT INT TERM
+# kill 0 = the whole process group: uv, the uvicorn reloader and its worker, and npm/next
+trap 'trap - EXIT INT TERM; kill 0' EXIT INT TERM
+(cd backend && exec uv run uvicorn app.main:app --reload --port 8000) &
 cd frontend && npm run dev

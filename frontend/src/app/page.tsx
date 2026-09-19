@@ -408,7 +408,7 @@ export default function Home() {
       </main>
 
       <footer className="mx-auto mt-auto flex w-full max-w-[1200px] flex-col justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800 px-4 py-6 text-[13px] text-zinc-500 dark:text-zinc-400 sm:flex-row sm:px-6">
-        <span>© Permafrost · built on Cognee</span>
+        <span>© Permafrost · a verification harness over Cognee</span>
         <span className="font-mono text-xs">Next.js · FastAPI · Cognee Cloud · SQLite</span>
       </footer>
     </div>

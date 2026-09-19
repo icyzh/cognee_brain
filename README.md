@@ -2,7 +2,7 @@
 
 **Ask why. Get the answer, the evidence, and the path.**
 
-Permafrost is a mini Company Brain built on Cognee. It connects a company's docs, tickets, meeting notes and org chart into one knowledge graph, then answers natural-language questions with cited evidence and a visible multi-hop path.
+Permafrost is a mini Company Brain: a **verification harness over Cognee**. Cognee remembers; Permafrost checks, time-stamps and measures what it remembers. It connects a company's docs, tickets, meeting notes and org chart into one knowledge graph, then answers natural-language questions with cited evidence and a visible multi-hop path.
 
 ## The idea
 
@@ -22,6 +22,20 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 - **Show** evidence cards, the hop path (`Service → Decision → Meeting → Person → Team`) and warnings when a cited decision has been superseded.
 - **Explore** the graph and the ingested sources directly.
 
+## A harness, not a wrapper
+
+A wrapper forwards calls. A harness constrains, checks and measures the engine inside it, and rejects its output when a check fails.
+
+| Cognee does | The Permafrost harness does |
+|---|---|
+| Chunking, entity extraction (`cognify`) | Verifies every structural edge against source metadata; ingest fails if an expected edge is missing |
+| Graph + vector storage | Drops false LLM edges from paths (seen: "ADR-007 affects svc-reports"); only `metadata ∩ graph` edges are walked |
+| `GRAPH_COMPLETION` retrieval | Refuses answers that cite no retrieved source; reports `unsupported_citations` |
+| Answer generation | Adds what a prompt cannot: the verified hop path, stale and contradiction warnings, the decision timeline, the ranked people to ask |
+| | Measures itself: the same 10 questions against raw Cognee and against Cognee + our prompt ([Eval](#eval)) |
+
+All Cognee traffic goes through one module, `backend/app/cognee_client.py`; everything else in `backend/app/` is the harness. The timeline, contradiction candidates and expert ranking make no Cognee calls at all.
+
 ## Structure from metadata. Meaning from the LLM.
 
 Permafrost does not rely on the LLM to invent the relationships its answers depend on.
@@ -33,7 +47,7 @@ Permafrost does not rely on the LLM to invent the relationships its answers depe
 
 ![Permafrost workflow](docs/workflow.png)
 
-Purple is Cognee; green is Permafrost's own layer. Source: [`docs/workflow.excalidraw`](docs/workflow.excalidraw).
+Purple is Cognee; green is the Permafrost harness. Source: [`docs/workflow.excalidraw`](docs/workflow.excalidraw).
 
 ## Architecture
 
@@ -60,7 +74,7 @@ Prerequisites: Node.js 20+, npm, [uv](https://docs.astral.sh/uv/) and Python 3.1
 ```bash
 bash scripts/init.sh                                   # deps + .env files; then fill COGNEE_* (and LLM_*) in backend/.env
 (cd backend && uv run python -m app.ingest --reset)    # build the graph once (~5 min)
-scripts/dev.sh                                         # backend :8000 + frontend :3000
+bash scripts/dev.sh                                    # backend :8000 + frontend :3000
 ```
 
 Open http://localhost:3000. The API runs on http://localhost:8000, with interactive docs at http://localhost:8000/docs.
@@ -98,8 +112,8 @@ The ablation row keeps us honest: the system prompt alone buys the grounding and
 The 2-minute script is in [`docs/plan.md` §7](docs/plan.md#7-demo-script-2-minutes-judging-round): the showcase question (4-hop path + stale warning), a refusal, dropping `data/live/MTG-0402.md` (contradiction alert in ~8 s), the re-ask with the contradiction warning, then the eval badge.
 
 ```bash
-scripts/restore_demo.sh save   # once, after the final ingest + eval: snapshot app.db
-scripts/restore_demo.sh        # before each run: un-ingest MTG-0402, restore app.db; then restart the backend
+bash scripts/restore_demo.sh save   # once, after the final ingest + eval: snapshot app.db
+bash scripts/restore_demo.sh        # before each run, backend stopped: restore app.db, un-ingest MTG-0402
 ```
 
 If Cognee Cloud is slow or down, a question that was answered before is served from the last answer (flagged `cached: true`); ask one question at a time, since concurrent Cloud searches slow down sharply.
