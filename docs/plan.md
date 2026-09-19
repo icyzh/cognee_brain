@@ -1,4 +1,4 @@
-# Decision Brain: Build Plan
+# Permafrost: Build Plan
 
 > A mini Company Brain on Cognee. It answers **why** a decision was made, **who** owns it now and **what** it affects. It shows evidence and the exact multi-hop path, and **flags stale or contradictory company knowledge**.
 >
@@ -161,7 +161,7 @@ flowchart LR
 2. **(15 s)** Ask *"What's our Kafka strategy?"* → **refuses**: "not in company knowledge". Point out that it never guesses.
 3. **(40 s)** Go to Alerts and drop `MTG-0402.md` (a new meeting proposing DynamoDB for payments). Ingest runs → a **contradiction alert** appears: *"MTG-0402 contradicts active ADR-007 (Postgres for ACID). Raised by Arjun; owner Priya."*
 4. **(20 s)** Re-ask the first question → the answer now carries the contradiction warning.
-5. **(20 s)** Open the eval badge → **raw Cognee vs Decision Brain** on the same 10 questions (grounded, stale flagged, refusals). This is the "not just a wrapper" answer. Then the architecture slide.
+5. **(20 s)** Open the eval badge → **raw Cognee vs Permafrost** on the same 10 questions (grounded, stale flagged, refusals). This is the "not just a wrapper" answer. Then the architecture slide.
 6. **(10 s)** Buffer.
 
 ---

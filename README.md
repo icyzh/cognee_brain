@@ -1,16 +1,16 @@
-# Decision Brain
+# Permafrost
 
 **Ask why. Get the answer, the evidence, and the path.**
 
-Decision Brain is a mini Company Brain built on Cognee. It connects a company's docs, tickets, meeting notes and org chart into one knowledge graph, then answers natural-language questions with cited evidence and a visible multi-hop path.
+Permafrost is a mini Company Brain built on Cognee. It connects a company's docs, tickets, meeting notes and org chart into one knowledge graph, then answers natural-language questions with cited evidence and a visible multi-hop path.
 
 ## The idea
 
 A new engineer asks, *"Why is payments on Postgres, and who owns it now?"* The answer exists, but it is scattered: an ADR records the decision, a meeting note records who made it, a ticket records the migration, and the org chart records who owns the service today. No single document holds the whole answer.
 
-Keyword search finds the pieces but not the links between them. Chatbots that answer from vector search alone can produce a confident answer with no trail behind it. Decision Brain keeps the links between documents as first-class graph edges, so every answer shows the chain of documents and people it came from.
+Keyword search finds the pieces but not the links between them. Chatbots that answer from vector search alone can produce a confident answer with no trail behind it. Permafrost keeps the links between documents as first-class graph edges, so every answer shows the chain of documents and people it came from.
 
-## What Decision Brain does
+## What Permafrost does
 
 - **Ingest** four source types from `data/seed/`: ADRs and docs (Markdown), tickets (JSON), meeting notes (Markdown) and the org chart (`team.json`).
 - **Build** a hybrid graph. Metadata becomes canonical structural edges (verified in the graph after ingestion), and Cognee's LLM extraction adds entities, topics and reasoning from prose.
@@ -20,7 +20,7 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 
 ## Structure from metadata. Meaning from the LLM.
 
-Decision Brain does not rely on the LLM to invent the relationships its answers depend on.
+Permafrost does not rely on the LLM to invent the relationships its answers depend on.
 
 - The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `decided_in`, `affects`, `supersedes`, `references`) come from source metadata and canonical IDs, and ingestion fails if any expected edge is missing from the graph.
 - The LLM handles only prose: entities, topics and the reasoning behind decisions. Those entities are then linked back to the canonical nodes.
@@ -28,7 +28,7 @@ Decision Brain does not rely on the LLM to invent the relationships its answers 
 
 ## Architecture
 
-![Decision Brain architecture](docs/architecture.png)
+![Permafrost architecture](docs/architecture.png)
 
 The Next.js frontend talks to a FastAPI backend over REST. The backend calls Cognee Cloud over REST; the graph, vector and metadata stores and the LLM are managed by the Cognee Cloud tenant, so no database server runs locally. App state such as question history and feedback lives in a separate SQLite file (`app.db`) accessed with Python's built-in `sqlite3`. Cognee Cloud is configured with `COGNEE_SERVICE_URL` and `COGNEE_API_KEY` in `backend/.env`.
 

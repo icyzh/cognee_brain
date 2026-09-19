@@ -70,7 +70,7 @@ new doc ingested
 - [ ] `GET /eval/latest` → `{decision_brain: {run_at, grounded_ok: 9, total: 10, hallucinated_sources: 0, ref_recall: 0.93, stale_flagged: 1}, raw_cognee: {…same fields…}}`
 
 ### Frontend
-- [ ] `EvalBadge` on the Ask page: `Eval 9/10 grounded · 0 hallucinated sources`; click → per-question table with a **raw Cognee vs Decision Brain** column pair
+- [ ] `EvalBadge` on the Ask page: `Eval 9/10 grounded · 0 hallucinated sources`; click → per-question table with a **raw Cognee vs Permafrost** column pair
 
 ---
 
@@ -88,7 +88,7 @@ new doc ingested
 - Re-ask the showcase question → it now includes the `contradiction` warning
 - Ingesting a non-conflicting doc raises **no** alert (false-positive check)
 - `uv run python -m eval.run_eval` → ≥ 9/10, 0 hallucinated sources; the badge shows it
-- `uv run python -m eval.run_eval --baseline` → raw Cognee scores recorded; Decision Brain beats it on stale flagged and refusals (if it doesn't, that's a finding to fix, not hide)
+- `uv run python -m eval.run_eval --baseline` → raw Cognee scores recorded; Permafrost beats it on stale flagged and refusals (if it doesn't, that's a finding to fix, not hide)
 - An MCP client (e.g. Claude Code) calls `ask_company_brain` with the showcase question and gets the same answer, evidence and path as the UI
 
 ## Exit gate

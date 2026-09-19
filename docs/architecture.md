@@ -1,4 +1,4 @@
-# Decision Brain: Technical Architecture
+# Permafrost: Technical Architecture
 
 A mini Company Brain on **Cognee**. It ingests docs, tickets and meeting notes into a hybrid graph+vector knowledge layer and answers natural-language questions with **evidence** and a **visible multi-hop path**.
 
