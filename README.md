@@ -22,7 +22,7 @@ Keyword search finds the pieces but not the links between them. Chatbots that an
 
 Permafrost does not rely on the LLM to invent the relationships its answers depend on.
 
-- The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `led_by`, `decided_in`, `affects`, `owned_by`, `supersedes`, `references`, `produced`) come from source metadata and canonical IDs, and ingestion fails if any expected edge is missing from the graph.
+- The edges used in the multi-hop demo (`attended_by`, `assigned_to`, `member_of`, `owns`, `led_by`, `decided_in`, `affects`, `owned_by`, `supersedes`, `references`, `produced`, `proposes_change_to`) come from source metadata and canonical IDs, and ingestion fails if any expected edge is missing from the graph.
 - The LLM handles only prose: entities, topics and the reasoning behind decisions. Those entities are then linked back to the canonical nodes.
 - A grounding guard answers only from retrieved context. Each answer carries `evidence[]`, `path[]` and `warnings[]`, and a supersede check flags stale decisions.
 
@@ -30,7 +30,7 @@ Permafrost does not rely on the LLM to invent the relationships its answers depe
 
 ![Permafrost architecture](docs/architecture.png)
 
-The Next.js frontend talks to a FastAPI backend over REST. The backend calls Cognee Cloud over REST; the graph, vector and metadata stores and the LLM are managed by the Cognee Cloud tenant, so no database server runs locally. App state such as question history and feedback lives in a separate SQLite file (`app.db`) accessed with Python's built-in `sqlite3`. Cognee Cloud is configured with `COGNEE_SERVICE_URL` and `COGNEE_API_KEY` in `backend/.env`.
+The Next.js frontend talks to a FastAPI backend over REST. The backend calls Cognee Cloud over REST; the graph, vector and metadata stores and the LLM are managed by the Cognee Cloud tenant, so no database server runs locally. App state such as question history and feedback lives in a separate SQLite file (`app.db`) accessed with Python's built-in `sqlite3`. Cognee Cloud is configured with `COGNEE_SERVICE_URL` and `COGNEE_API_KEY` in `backend/.env`; contradiction alerts also need `LLM_MODEL` / `LLM_API_KEY` (a direct OpenAI call for the judge).
 
 The full design is in [`docs/architecture.md`](docs/architecture.md): ingestion pipeline, graph schema, query sequence, reliability plan and scale-out path. The diagram source is [`docs/architecture.excalidraw`](docs/architecture.excalidraw).
 
@@ -42,7 +42,7 @@ The full design is in [`docs/architecture.md`](docs/architecture.md): ingestion 
 
 ## Status
 
-Phases 0–1 are done: Cognee Cloud spike, seed data (Snow Pay, `data/seed/`), and ingestion (`POST /ingest`, `GET /sources`, `GET /graph`). `/ask` and the UI wiring follow [`docs/plan.md`](docs/plan.md).
+Phases 0–4 are done: Cognee Cloud ingestion, `POST /ask` with evidence and a verified hop path, the frontend, contradiction alerts with live upload, the eval with a raw-Cognee baseline, and an MCP tool for agents. Phase 5 (hardening and demo prep) follows [`docs/plan.md`](docs/plan.md).
 
 ## Run locally
 
@@ -59,4 +59,25 @@ Open http://localhost:3000. The API runs on http://localhost:8000, with interact
 
 ```bash
 cd frontend && npx tsc --noEmit && npm run lint && npm run build
+```
+
+## Use from an agent
+
+The repo's `.mcp.json` registers an MCP server with one tool, `ask_company_brain(question)`, which calls `POST /ask` and returns the same answer, evidence, path and warnings as the UI. Start the backend, then open the repo in Claude Code (or any MCP client) and ask it a company question.
+
+## Eval
+
+```bash
+cd backend && uv run python -m eval.run_eval              # our pipeline, 10 questions
+cd backend && uv run python -m eval.run_eval --baseline   # the same questions through raw Cognee
+```
+
+Both runs are stored in `app.db` and served at `GET /eval/latest` (the UI's eval badge).
+
+Latest run: Permafrost 10/10 grounded · expected refs cited 100% · stale 2/2 · verified path 5/5 · 0 hallucinated sources; raw Cognee 9/10 · 55% · 1/2 · 0/5 · 0.
+
+## Demo reset
+
+```bash
+cd backend && uv run python -m app.ingest --forget ../data/live/MTG-0402.md   # un-ingest the live-demo meeting
 ```

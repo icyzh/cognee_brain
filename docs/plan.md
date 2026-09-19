@@ -51,13 +51,15 @@ A fictional company, **Snow Pay**, with **canonical IDs shared across every sour
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | liveness, cognee config, graph stats |
-| `POST /ingest` | batch (seed dir) or single upload (live demo) → returns new alerts |
-| `POST /ask` | `{question}` → `{answer, evidence[], path[], warnings[], grounded, latency_ms}` |
+| `POST /ingest` | batch (seed dir) → stats; or multipart upload (live demo) → `{source_ref, alerts[], graph_status, took_ms}` in ~8 s, graph builds in the background |
+| `GET /ingest/status` | `{building}` while a live upload's graph is being built |
+| `POST /ask` | `{question}` → `{answer, evidence[], path[], warnings[], grounded, latency_ms, qa_id}`; `?raw=true` = plain Cognee for the side-by-side |
 | `GET /graph` | nodes and edges for the explorer (optional `?focus=<id>&depth=2`) |
+| `GET /graph/cognee` | Cognee's own rendered graph page, proxied (keeps the API key server-side) |
 | `GET /sources` | every ingested item with hash, type and time |
 | `GET /alerts` | contradictions and stale decisions |
-| `POST /feedback` | 👍/👎 on an answer |
-| `GET /eval/latest` | latest eval run summary |
+| `POST /feedback` | `{qa_id, helpful, comment?}` |
+| `GET /eval/latest` | latest eval run per variant: ours vs raw Cognee |
 
 Modules: `query/ask.py` (retrieve → guard → supersede → path), `query/paths.py`, `analysis/contradictions.py`, `store.py` (app.db).
 
@@ -86,7 +88,7 @@ Modules: `query/ask.py` (retrieve → guard → supersede → path), `query/path
 | [P1](phases/phase-1-data-and-ingestion.md) | Seed data + ingestion | Data, Cognee, Backend | 2–2.5 h | `uv run python -m app.ingest` builds the graph; the showcase path exists in the graph |
 | [P2](phases/phase-2-query-pipeline.md) | Query pipeline `/ask` | Cognee, Backend | 2 h | The showcase question returns a grounded answer, evidence, the 4-hop path and a stale warning via curl |
 | [P3](phases/phase-3-frontend.md) | Frontend Ask experience | Frontend | 2 h | End-to-end demo in the browser |
-| [P4](phases/phase-4-differentiators.md) | Contradictions + live ingest + eval + MCP agent tool | All | 2–2.5 h | Dropping `MTG-0402.md` raises an alert in ≤ 30 s; eval badge shows ≥ 9/10 |
+| [P4](phases/phase-4-differentiators.md) | Contradictions + live ingest + eval + MCP agent tool | All | 2–2.5 h | Dropping `MTG-0402.md` raises an alert in ~8 s; eval badge shows 10/10 vs raw Cognee's 9/10 |
 | [P5](phases/phase-5-hardening-and-demo.md) | Hardening, docs, pitch | Quality, All | 1.5 h | Demo rehearsed 3× clean; README and slides done |
 
 > Estimates are focused-work hours for a small team. **Backend and frontend can run in parallel from P2 onward** (frontend builds against the `/ask` contract with a mock JSON).
@@ -148,6 +150,8 @@ flowchart LR
 | ~~Cognee API differs from the docs~~ **Resolved in P0**: REST verified; no custom DataPoints in cloud → text triples | High | High | P0 spike | P0 |
 | `cognify` slow or rate-limited | Med | High | Tenant-managed model; build the graph before the demo; live ingest is only 1 small file | P1, P5 |
 | LLM entities don't align with canonical IDs | Med | Med | Alias table + normalization; the path relies on the verified structural edges | P1 |
+| Judge verdict varies (gpt-5.6-luna rejects temperature 0) | Low | Med | Strict JSON verdict, same-service active candidates, threshold 0.7; the demo file is unambiguous (0.99 in every run) | P4 |
+| Concurrent Cognee searches time out (2 in flight blew the 23 s budget) | Med | High | Eval runs one question at a time; demo asks one question at a time; 23 s budget + retry | P4, P5 |
 | Answer text ignores the stale decision | Med | Med | Supersede check is **post-retrieval code**, not a prompt; warnings are always attached | P2 |
 | Contradiction false positives | Med | Med | Only compare against the same service + active decisions; LLM judge returns a reason; demo file is crafted | P4 |
 | Demo network or LLM failure | Low | High | Cached answers for the 3 scripted queries; a recorded backup video | P5 |
@@ -157,12 +161,14 @@ flowchart LR
 
 ## 7. Demo script (2 minutes, judging round)
 
-1. **(15 s)** Ask *"Why is payments on Postgres, and who should I talk to about it now?"* → answer, 3 evidence cards, 4-hop path, **STALE** badge (ADR-003 was superseded).
-2. **(15 s)** Ask *"What's our mobile release cadence?"* → **refuses**: "not in company knowledge". Point out that it never guesses.
-3. **(40 s)** Go to Alerts and drop `MTG-0402.md` (a new meeting proposing DynamoDB for payments). Ingest runs → a **contradiction alert** appears: *"MTG-0402 contradicts active ADR-007 (Postgres for ACID). Raised by Arjun; owner Priya."*
-4. **(20 s)** Re-ask the first question → the answer now carries the contradiction warning.
-5. **(20 s)** Open the eval badge → **raw Cognee vs Permafrost** on the same 10 questions (grounded, stale flagged, refusals). This is the "not just a wrapper" answer. Then the architecture slide.
-6. **(10 s)** Buffer.
+Measured: `/ask` 10–16 s, alert ~8 s. Ask one question at a time (Cognee Cloud slows under concurrent searches).
+
+1. **(20 s)** Ask *"Why is payments on Postgres, and who should I talk to about it now?"* → answer, 3 evidence cards, 4-hop path, **STALE** badge (ADR-003 was superseded). Talk over the ~12 s wait: "it's walking the graph".
+2. **(20 s)** Ask *"What's our mobile release cadence?"* → **refuses**: "not in company knowledge". Point out that it never guesses.
+3. **(20 s)** Go to Alerts and drop `MTG-0402.md` (a new meeting proposing DynamoDB for payments). In ~8 s a **contradiction alert** appears: *"MTG-0402 contradicts ADR-007 (Postgres for ACID). People: Priya (owner), Arjun (raised it)."* The graph keeps building in the background.
+4. **(20 s)** Re-ask the first question → the answer now carries the contradiction warning (it's there immediately).
+5. **(20 s)** Open the eval badge → **Permafrost vs raw Cognee** on the same 10 questions: verified path 5/5 vs 0/5, stale flagged 2/2 vs 1/2, grounded 10/10 vs 9/10 (raw answered the off-corpus question), expected refs cited 100% vs 55%. This is the "not just a wrapper" answer.
+6. **(20 s)** Buffer.
 
 ---
 

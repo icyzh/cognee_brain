@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "company-brain": {
+      "command": "uv",
+      "args": ["run", "--directory", "backend", "python", "mcp_server.py"]
+    }
+  }
+}

@@ -7,7 +7,7 @@
 ---
 
 ## Reliability (Backend + Cognee)
-- [ ] **Demo reset:** after the final seed ingest, freeze the `snow` dataset (no more re-ingest) and back up `app.db` → `snapshots/demo/`; `scripts/restore_demo.sh` deletes the `live` dataset over REST (`DELETE /api/v1/datasets/{id}`) and restores `app.db`
+- [ ] **Demo reset:** after the final seed ingest, freeze the `snow` dataset (no more re-ingest) and back up `app.db` → `snapshots/demo/`; `scripts/restore_demo.sh` runs `uv run python -m app.ingest --forget ../data/live/MTG-0402.md` (MTG-0402 lives in the same `snow` dataset) and restores `app.db`
 - [ ] **Cached fallback:** answers for the 3 scripted questions stored in `app.db`. If the live call fails or takes > 20 s, serve the cache (flagged `cached: true` in the logs, not hidden from Q&A if asked)
 - [ ] Retries with backoff on Cognee Cloud 429/5xx; clear error JSON (`{error, retryable}`), no stack traces to the client
 - [ ] Structured logs (JSON lines): request id, endpoint, latency, tokens, grounded
@@ -53,7 +53,7 @@ Production standards, architecture, completeness (PS checklist), reliability (ev
 - [ ] Run the [demo script](../plan.md#7-demo-script-2-minutes-judging-round) **3 times clean** from `restore_demo.sh`
 - [ ] Time it: ≤ 2:00
 - [ ] Record a backup screen video of one clean run
-- [ ] Pre-demo checklist: backend up, `/health` green, snapshot restored, browser zoom 125%, notifications off, MTG-0402 file on the desktop
+- [ ] Pre-demo checklist: backend up, `/health` green, `uv run python -m app.ingest --forget ../data/live/MTG-0402.md` run (so the live drop is fresh), snapshot restored, browser zoom 125%, notifications off, MTG-0402 file on the desktop
 
 ## 4:30–5:00 (after mentoring)
 - [ ] Apply only **small**, low-risk mentor feedback (copy, UI emphasis, slide order)

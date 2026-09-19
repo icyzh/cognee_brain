@@ -1,0 +1,20 @@
+[
+  {"q": "Why is payments on Postgres, and who should I talk to about it now?", "kind": "multi-hop",
+   "expect_grounded": true, "expect_refs": ["ADR-007", "MTG-0312"], "expect_path_end": "platform", "expect_stale": "ADR-003"},
+  {"q": "Who owns the service affected by TCK-118?", "kind": "multi-hop",
+   "expect_grounded": true, "expect_refs": ["TCK-118"], "expect_path_end": "data"},
+  {"q": "Who decided how we send customer notifications, and which team are they on?", "kind": "multi-hop",
+   "expect_grounded": true, "expect_refs": ["ADR-009"], "expect_path_end": "payments-product"},
+  {"q": "Who should I ask about auth token expiry?", "kind": "multi-hop",
+   "expect_grounded": true, "expect_refs": ["ADR-001"], "expect_path_end": "platform"},
+  {"q": "Who decided to use idempotency keys on payment writes, and which team are they on?", "kind": "multi-hop",
+   "expect_grounded": true, "expect_refs": ["ADR-008"], "expect_path_end": "platform"},
+  {"q": "What is the status of TCK-142?", "kind": "single-hop",
+   "expect_grounded": true, "expect_refs": ["TCK-142"]},
+  {"q": "When was ADR-004 decided, and in which meeting?", "kind": "single-hop",
+   "expect_grounded": true, "expect_refs": ["ADR-004"]},
+  {"q": "What's our mobile release cadence?", "kind": "refusal", "expect_grounded": false, "expect_refs": []},
+  {"q": "What's our Kubernetes autoscaling policy?", "kind": "refusal", "expect_grounded": false, "expect_refs": []},
+  {"q": "Do we still send notifications by email only?", "kind": "stale",
+   "expect_grounded": true, "expect_refs": ["ADR-005", "ADR-009"], "expect_stale": "ADR-005"}
+]

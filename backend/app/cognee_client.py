@@ -49,13 +49,22 @@ async def add_text(text: str, node_set: list[str], dataset: str, filename: str |
     """/add one document. Returns its data_id (stored in app.db sources)."""
     files = {"data": (filename or f"{uuid.uuid4().hex}.txt", text.encode(), "text/plain")}
     async with _client() as c:
-        body = await _json(await c.post("/add", files=files, data={"datasetName": dataset, "node_set": node_set}))
+        for attempt in range(3):  # Cloud drops connections under parallel load (seen: 409 "connection was closed")
+            try:
+                resp = await c.post("/add", files=files, data={"datasetName": dataset, "node_set": node_set})
+                if resp.status_code not in (409, 429, 500, 502, 503, 504) or attempt == 2:
+                    break
+            except httpx.TransportError:
+                if attempt == 2:
+                    raise
+            await asyncio.sleep(2 * (attempt + 1))
+        body = await _json(resp)
     return body["data_ingestion_info"][0]["data_id"]
 
 
-async def add_structural(triples: list[tuple[str, str, str]], dataset: str, filename: str | None = None) -> str:
-    """Canonical triples rendered as text into /add with node_set=["structural"]. Returns the data_id."""
-    return await add_text(render_triples(triples), ["structural"], dataset, filename)
+async def add_structural(triples: list[tuple[str, str, str]], dataset: str, filename: str | None = None, facts: list[str] = ()) -> str:
+    """Canonical triples (+ metadata fact sentences) as text into /add with node_set=["structural"]. Returns the data_id."""
+    return await add_text("\n".join([render_triples(triples), *facts]), ["structural"], dataset, filename)
 
 
 async def build(dataset: str) -> None:

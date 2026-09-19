@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from contextlib import closing
 
@@ -110,6 +111,7 @@ def reset_ingest_state() -> None:
     with closing(connect()) as conn, conn:
         conn.execute("DELETE FROM sources")
         conn.execute("DELETE FROM aliases")
+        conn.execute("DELETE FROM alerts")
 
 
 def get_source_by_ref(ref: str) -> sqlite3.Row | None:
@@ -128,3 +130,62 @@ def log_qa(question: str, answer: str, response_json: str, grounded: bool, token
 def add_feedback(qa_id: int, helpful: bool, comment: str | None = None) -> None:
     with closing(connect()) as conn, conn:
         conn.execute("INSERT INTO feedback (qa_id, helpful, comment) VALUES (?, ?, ?)", (qa_id, int(helpful), comment))
+
+
+def add_alert(kind: str, new_ref: str | None, existing_ref: str | None, service: str | None, reason: str, confidence: float | None) -> dict:
+    with closing(connect()) as conn, conn:
+        row_id = conn.execute(
+            "INSERT INTO alerts (kind, new_ref, existing_ref, service, reason, confidence) VALUES (?, ?, ?, ?, ?, ?)",
+            (kind, new_ref, existing_ref, service, reason, confidence),
+        ).lastrowid
+        return dict(conn.execute("SELECT * FROM alerts WHERE id = ?", (row_id,)).fetchone())
+
+
+def replace_stale_alerts(rows: list[tuple]) -> None:
+    """rows: (new_ref, existing_ref, service, reason)."""
+    with closing(connect()) as conn, conn:
+        conn.execute("DELETE FROM alerts WHERE kind = 'stale'")
+        conn.executemany("INSERT INTO alerts (kind, new_ref, existing_ref, service, reason) VALUES ('stale', ?, ?, ?, ?)", rows)
+
+
+def list_alerts() -> list[dict]:
+    with closing(connect()) as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM alerts ORDER BY created_at DESC, id DESC")]
+
+
+def clear_contradictions(new_ref: str) -> None:
+    with closing(connect()) as conn, conn:
+        conn.execute("DELETE FROM alerts WHERE kind = 'contradiction' AND new_ref = ?", (new_ref,))
+
+
+def contradictions_for(refs: list[str]) -> list[dict]:
+    if not refs:
+        return []
+    with closing(connect()) as conn:
+        q = f"SELECT * FROM alerts WHERE kind = 'contradiction' AND existing_ref IN ({','.join('?' * len(refs))}) ORDER BY id"
+        return [dict(r) for r in conn.execute(q, refs)]
+
+
+def delete_source(path: str) -> None:
+    with closing(connect()) as conn, conn:
+        conn.execute("DELETE FROM sources WHERE path = ?", (path,))
+
+
+def add_eval_run(variant: str, summary: dict, rows: list[dict]) -> None:
+    extra = {k: v for k, v in summary.items() if k not in ("grounded_ok", "total", "hallucinated_sources", "ref_recall")}
+    with closing(connect()) as conn, conn:
+        conn.execute(
+            "INSERT INTO eval_runs (variant, grounded_ok, total, hallucinated_sources, ref_recall, results_json) VALUES (?, ?, ?, ?, ?, ?)",
+            (variant, summary["grounded_ok"], summary["total"], summary["hallucinated_sources"], summary["ref_recall"],
+             json.dumps(extra | {"results": rows})),
+        )
+
+
+def latest_eval(variant: str) -> dict | None:
+    with closing(connect()) as conn:
+        r = conn.execute("SELECT * FROM eval_runs WHERE variant = ? ORDER BY id DESC LIMIT 1", (variant,)).fetchone()
+    if not r:
+        return None
+    extra = json.loads(r["results_json"] or "{}")
+    return {"run_at": r["created_at"], "grounded_ok": r["grounded_ok"], "total": r["total"],
+            "hallucinated_sources": r["hallucinated_sources"], "ref_recall": r["ref_recall"], **extra}

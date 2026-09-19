@@ -5,6 +5,15 @@ def _list(v) -> list:
     return [] if v is None else v if isinstance(v, list) else [v]
 
 
+def facts(rec: dict) -> list[str]:
+    """Key metadata as plain sentences, sent in the triples doc. Retrieval favors that small doc for
+    ID-centric questions ("status of TCK-142?"), and without these it held no status/date/title (eval).
+    Not edges: kept out of triples(), so they're never verified or used in paths."""
+    m, ref = rec["meta"], rec["ref"]
+    keys = {"adr": ("title", "status", "date"), "ticket": ("title", "status", "created"), "meeting": ("title", "date")}
+    return [f"{ref} {k} is {m[k]}." for k in keys.get(rec["type"], ()) if m.get(k)]
+
+
 def triples(rec: dict) -> list[tuple[str, str, str]]:
     m, ref = rec["meta"], rec["ref"]
     out: list[tuple[str, str, str]] = []
@@ -26,4 +35,5 @@ def triples(rec: dict) -> list[tuple[str, str, str]]:
     elif rec["type"] == "meeting":
         out += [(ref, "attended_by", p) for p in _list(m.get("attendees"))]
         out += [(ref, "produced", d) for d in _list(m.get("decisions"))]
+        out += [(ref, "proposes_change_to", s) for p in _list(m.get("proposals")) for s in _list(p.get("affects"))]
     return out

@@ -31,6 +31,10 @@ def test_showcase_path_is_the_4_hop_story():
 def test_no_anchor_or_target_means_no_path():
     use_metadata_graph()
     assert paths.best_path([], ["Person:priya"]) == []
+    # no anchor in the question: the decision the answer cites anchors the path, and the verified
+    # member_of edge wins over the LLM's claim ("marco ... part of the svc-payments team")
+    assert [h[2] for h in paths.best_path([], ["Person:marco", "Service:svc-payments", "Decision:ADR-008"])] == [
+        "Meeting:MTG-0305", "Person:marco", "Team:platform"]
     assert paths.best_path(["Service:svc-payments"], ["Decision:ADR-007"]) == []
 
 

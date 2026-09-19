@@ -37,7 +37,12 @@ async function request<T>(path: string, body?: unknown, timeoutMs = 25_000): Pro
         : `Can't reach the backend at ${BASE}.`,
     );
   }
-  if (!res.ok) throw new ApiError(`The backend returned ${res.status} ${res.statusText}.`);
+  if (!res.ok) {
+    // FastAPI puts the reason in `detail` (a string, or {error} for knowledge-layer failures)
+    const detail = await res.json().then((b) => b?.detail, () => undefined);
+    const why = typeof detail === "string" ? detail : detail?.error;
+    throw new ApiError(why ? `${why} (${res.status})` : `The backend returned ${res.status} ${res.statusText}.`);
+  }
   return res.json();
 }
 
@@ -66,7 +71,7 @@ export async function alerts(): Promise<Alert[]> {
   return request("/alerts");
 }
 
-// Live ingest runs cognify + contradiction checks: allow 60 s (target is ≤ 30 s).
+// Live ingest returns after /add + the contradiction judge (~8 s); cognify finishes in the background.
 export async function ingestFile(file: File): Promise<IngestResult> {
   if (USE_MOCK) {
     await delay(6000);

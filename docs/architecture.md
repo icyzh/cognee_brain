@@ -133,7 +133,7 @@ flowchart TB
     subgraph STRUCT["Structural path: from metadata, verified"]
         M1["Render metadata as text triples with raw IDs, e.g. ADR-007 affects svc-payments"]
         M2["After cognify: alias index maps LLM names to Type:id (Person, Team, Service, Decision, Ticket, Meeting)"]
-        M3["Triples: member_of, owns, led_by, affects, decided_in, owned_by, supersedes, assigned_to, about, references, attended_by, produced"]
+        M3["Triples: member_of, owns, led_by, affects, decided_in, owned_by, supersedes, assigned_to, about, references, attended_by, produced, proposes_change_to"]
     end
 
     subgraph SEM["Semantic path: LLM"]
@@ -169,7 +169,7 @@ flowchart TB
 |---|---|---|---|
 | ADR / docs | Markdown + YAML frontmatter (`id`, `status`, `decided_in`, `affects`, `supersedes`, `owner`) | `Decision -affects-> Service`, `Decision -supersedes-> Decision`, `Decision -decided_in-> Meeting`, `Decision -owned_by-> Person` | Rationale, alternatives, trade-offs |
 | Tickets | JSON (`id`, `title`, `assignee`, `service`, `refs`, `status`) | `Ticket -assigned_to-> Person`, `Ticket -about-> Service`, `Ticket -references-> Decision` | Problem description, discussion |
-| Meeting notes | Markdown (`date`, `title`, `attendees`, `decisions`) | `Meeting -attended_by-> Person`, `Meeting -produced-> Decision` | Who argued what, open questions |
+| Meeting notes | Markdown (`date`, `title`, `attendees`, `decisions`) | `Meeting -attended_by-> Person`, `Meeting -produced-> Decision`, `Meeting -proposes_change_to-> Service` (from `proposals[].affects`) | Who argued what, open questions |
 | Org chart | JSON | `Person -member_of-> Team`, `Team -owns-> Service`, `Team -led_by-> Person` | A short `[ORG CHART]` text doc (who leads what, aliases) |
 
 ---
@@ -193,6 +193,7 @@ flowchart LR
     D -- decided_in --> M
     M -- attended_by --> P
     M -- produced --> D
+    M -- proposes_change_to --> S
     D -- supersedes --> D
     D -- owned_by --> P
     T -- led_by --> P
@@ -205,7 +206,7 @@ flowchart LR
     K -- about_topic --> TOP
 ```
 
-Cognee Cloud has no REST route for custom `DataPoint`s (`add_data_points` is in-process only; spike S3). Structural edges are therefore sent as canonical text triples into `/add` (`node_set=structural`), and P1 checks that every expected edge exists in `GET /datasets/{id}/graph`. A `/cognify` `graphModel` JSON schema can type the nodes if needed. Citations come from the `DocumentChunk`s in the search result: each chunk's `TextDocument` is named after our upload filename (the ref, e.g. `ADR-007`), which `app.db` `sources.ref` maps back to the seed file. Chunks from triples docs are not used as evidence.
+Cognee Cloud has no REST route for custom `DataPoint`s (`add_data_points` is in-process only; spike S3). Structural edges are therefore sent as canonical text triples into `/add` (`node_set=structural`), and P1 checks that every expected edge exists in `GET /datasets/{id}/graph`. A `/cognify` `graphModel` JSON schema can type the nodes if needed. Citations come from the `DocumentChunk`s in the search result: each chunk's `TextDocument` is named after our upload filename (the ref, e.g. `ADR-007`), which `app.db` `sources.ref` maps back to the seed file. Chunks from triples docs are not used as evidence. The same triples doc also carries metadata fact sentences (`structural.facts`: title, status, date), because retrieval favors that small doc for ID-centric questions; they are never used as edges.
 
 `cognify` also creates its own node types alongside ours: `TextDocument`, `DocumentChunk`, `TextSummary`, `Entity`, `EntityType` and `NodeSet` (spike S9). The graph explorer should hide or dim them.
 
@@ -244,7 +245,7 @@ sequenceDiagram
     else grounded
         GG->>SC: path = weighted shortest path over metadata triples ∩ graph edges
         SC->>SC: supersedes from ADR frontmatter (cached): ADR-003 superseded by ADR-007
-        SC-->>API: answer + evidence + path + stale warnings
+        SC-->>API: answer + evidence + path + stale and contradiction warnings
     end
     API->>DB: log question, answer, latency, sources
     API-->>FE: {answer, evidence[], path[], warnings[]}
@@ -341,7 +342,8 @@ flowchart TB
 | Hallucinated answer | Answer only from retrieved context; refuse on the NOT_FOUND sentinel or when no cited source exists in `sources`; always return evidence |
 | Broken multi-hop path | Demo path runs over **structural edges generated from metadata and verified after cognify**, and canonical IDs avoid entity-resolution errors |
 | Ingestion slow or failing live | Graph built before the demo and left untouched; content-hash dedupe makes re-ingest idempotent |
-| Cognee Cloud rate limits or slow queries (10–13 s per /ask) | Tenant-managed model, retries with backoff, cached fallback for the scripted query |
+| Cognee Cloud rate limits or slow queries (10–16 s per /ask; concurrent searches time out) | Tenant-managed model, retries with backoff, cached fallback for the scripted query |
+| Contradiction false positives | Same-service, active-only candidates; judge confidence ≥ 0.7; ≤ 10 judge calls per upload; uploaded text fenced against prompt injection |
 | Cognee API drift | Pinned version in `uv.lock`, with a thin `app/cognee_client.py` wrapper as the single integration point |
 | Stale knowledge | `supersedes` edges produce warnings in the answer |
 
@@ -378,8 +380,11 @@ backend/
     query/
       ask.py                # retrieve -> guard -> supersede -> path
       paths.py              # weighted shortest path over metadata triples ∩ graph edges -> path[]
+    analysis/contradictions.py  # claims → same-service active candidates → OpenAI judge → alerts
     store.py                # sqlite3 app.db (sources, aliases, history, feedback, alerts, eval)
-  tests/test_ingest.py      # offline checks: uv run python -m tests.test_ingest
+  tests/                    # offline checks: uv run python -m tests.<test_ingest|test_ask|test_contradictions>
+  eval/                     # questions.json + run_eval.py [--baseline]
+  mcp_server.py             # MCP stdio tool ask_company_brain → POST /ask (registered in /.mcp.json)
   eval/
     questions.json          # 10 Qs + expected sources/path
     run_eval.py

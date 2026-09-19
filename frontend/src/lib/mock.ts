@@ -62,7 +62,7 @@ export const mockAlerts: Alert[] = [
     reason: "MTG-0402 proposes moving payments storage to DynamoDB, but ADR-007 (accepted) keeps the ledger on Postgres for multi-row ACID.",
     confidence: 0.91,
     created_at: "2026-09-19 09:41:12",
-    people: ["arjun", "priya"],
+    people: ["priya", "arjun"],
   },
   {
     id: 1,
@@ -78,43 +78,220 @@ export const mockAlerts: Alert[] = [
 
 export const mockIngest = (name: string): IngestResult => ({
   source_ref: name.replace(/\.[^.]+$/, ""),
-  nodes_added: 14,
+  nodes_added: 0,
+  graph_status: "building",
   alerts: name.startsWith("MTG-0402") ? [mockAlerts[0]] : [],
-  took_ms: 21400,
+  took_ms: 8400,
 });
 
-const QUESTIONS = [
-  SHOWCASE_QUESTION,
-  OWNER_QUESTION,
-  "Which service does TCK-142 migrate?",
-  "Who attended the meeting where ADR-007 was decided?",
-  "Is ADR-003 still the storage decision for payments?",
-  "Which team owns svc-notify?",
-  "Who is on the platform team?",
-  "What did MTG-0305 decide about retries?",
-  REFUSAL_QUESTION,
-  "What's our mobile release cadence?",
-];
-
+// Mirrors the real eval run (backend/eval/questions.json, uv run python -m eval.run_eval [--baseline]).
 export const mockEval: EvalLatest = {
-  decision_brain: {
-    run_at: "2026-09-19 08:02:10",
-    grounded_ok: 9,
-    total: 10,
-    hallucinated_sources: 0,
-    ref_recall: 0.93,
-    stale_flagged: 1,
-    results: QUESTIONS.map((q, i) => ({ q, grounded_ok: i !== 7, ref_recall: i === 7 ? 0.5 : 1 })),
+  "decision_brain": {
+    "run_at": "2026-09-19 08:55:54",
+    "grounded_ok": 10,
+    "total": 10,
+    "hallucinated_sources": 0,
+    "ref_recall": 1.0,
+    "stale_flagged": 2,
+    "stale_total": 2,
+    "path_ok": 5,
+    "path_total": 5,
+    "results": [
+      {
+        "q": "Why is payments on Postgres, and who should I talk to about it now?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": true,
+        "stale_ok": true
+      },
+      {
+        "q": "Who owns the service affected by TCK-118?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": true,
+        "stale_ok": null
+      },
+      {
+        "q": "Who decided how we send customer notifications, and which team are they on?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": true,
+        "stale_ok": null
+      },
+      {
+        "q": "Who should I ask about auth token expiry?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": true,
+        "stale_ok": null
+      },
+      {
+        "q": "Who decided to use idempotency keys on payment writes, and which team are they on?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": true,
+        "stale_ok": null
+      },
+      {
+        "q": "What is the status of TCK-142?",
+        "kind": "single-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "When was ADR-004 decided, and in which meeting?",
+        "kind": "single-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "What's our mobile release cadence?",
+        "kind": "refusal",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "What's our Kubernetes autoscaling policy?",
+        "kind": "refusal",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "Do we still send notifications by email only?",
+        "kind": "stale",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": true
+      }
+    ]
   },
-  raw_cognee: {
-    run_at: "2026-09-19 08:05:47",
-    grounded_ok: 7,
-    total: 10,
-    hallucinated_sources: 2,
-    ref_recall: 0.71,
-    stale_flagged: 0,
-    results: QUESTIONS.map((q, i) => ({ q, grounded_ok: ![4, 8, 9].includes(i), ref_recall: [0, 3].includes(i) ? 0.5 : 0.8 })),
-  },
+  "raw_cognee": {
+    "run_at": "2026-09-19 08:57:52",
+    "grounded_ok": 9,
+    "total": 10,
+    "hallucinated_sources": 0,
+    "ref_recall": 0.55,
+    "stale_flagged": 1,
+    "stale_total": 2,
+    "path_ok": 0,
+    "path_total": 5,
+    "results": [
+      {
+        "q": "Why is payments on Postgres, and who should I talk to about it now?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 0.5,
+        "hallucinated": [],
+        "path_ok": false,
+        "stale_ok": false
+      },
+      {
+        "q": "Who owns the service affected by TCK-118?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 0.0,
+        "hallucinated": [],
+        "path_ok": false,
+        "stale_ok": null
+      },
+      {
+        "q": "Who decided how we send customer notifications, and which team are they on?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 0.0,
+        "hallucinated": [],
+        "path_ok": false,
+        "stale_ok": null
+      },
+      {
+        "q": "Who should I ask about auth token expiry?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 0.0,
+        "hallucinated": [],
+        "path_ok": false,
+        "stale_ok": null
+      },
+      {
+        "q": "Who decided to use idempotency keys on payment writes, and which team are they on?",
+        "kind": "multi-hop",
+        "grounded_ok": true,
+        "ref_recall": 0.0,
+        "hallucinated": [],
+        "path_ok": false,
+        "stale_ok": null
+      },
+      {
+        "q": "What is the status of TCK-142?",
+        "kind": "single-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "When was ADR-004 decided, and in which meeting?",
+        "kind": "single-hop",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "What's our mobile release cadence?",
+        "kind": "refusal",
+        "grounded_ok": false,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "What's our Kubernetes autoscaling policy?",
+        "kind": "refusal",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": null
+      },
+      {
+        "q": "Do we still send notifications by email only?",
+        "kind": "stale",
+        "grounded_ok": true,
+        "ref_recall": 1.0,
+        "hallucinated": [],
+        "path_ok": null,
+        "stale_ok": true
+      }
+    ]
+  }
 };
 
 export const mockGraph: GraphData = {

@@ -10,7 +10,7 @@ from app.ingest import align, loaders, structural
 INVERSE = {
     "affects": "affected_by", "owns": "owned_by", "member_of": "has_member", "led_by": "leads",
     "decided_in": "decided", "owned_by": "owns", "supersedes": "superseded_by", "assigned_to": "assigned",
-    "about": "has_ticket", "references": "referenced_by", "attended_by": "attended", "produced": "produced_by",
+    "about": "has_ticket", "references": "referenced_by", "attended_by": "attended", "produced": "produced_by", "proposes_change_to": "change_proposed_in",
 }
 # Tie-breaks between equally short routes: decision → meeting → person tells the "why + who" story;
 # a ticket or bare ownership hop is the fallback.
@@ -19,7 +19,7 @@ WEIGHT = {"owned_by": 2.5, "assigned_to": 1.5, "about": 1.5, "references": 1.5}
 _cache: dict = {}
 
 
-async def refresh() -> None:
+async def refresh(graph: cognee_client.GraphDump | None = None) -> None:
     """Rebuild the adjacency; call at startup and after /ingest.
 
     Path edges = metadata triples ∩ graph edges. The LLM also writes edges between canonical nodes,
@@ -32,8 +32,9 @@ async def refresh() -> None:
         (align.canonical_id(s, aliases), r, align.canonical_id(o, aliases))
         for rec in records for s, r, o in structural.triples(rec)
     }
-    graph = await cognee_client.graph_dump()
+    graph = graph or await cognee_client.graph_dump()  # ingest passes the dump it already has (~6 s each)
     build(align.canonical_edges(graph, aliases) & truth, aliases, {r["ref"]: r["meta"] for r in records if r["type"] == "adr"})
+    _cache["nodes"] = len(graph["nodes"])
 
 
 def build(edges: set[tuple[str, str, str]], aliases: dict[str, str], adrs: dict[str, dict]) -> None:
@@ -86,8 +87,13 @@ def shortest(a: str, b: str, max_hops: int = 4) -> list[tuple[str, str, str]] | 
 
 
 def best_path(question_ids: list[str], answer_ids: list[str]) -> list[tuple[str, str, str]]:
-    """Anchor (first Service/Decision/Ticket in the question) → cited *active* decision → person → team."""
+    """Anchor (first Service/Decision/Ticket in the question) → cited *active* decision → person → team.
+
+    No anchor in the question ("who decided how we send customer notifications?") → the first decision
+    the answer cites is the anchor: its path still shows who decided it, where, and their real team.
+    """
     anchor = next((i for i in question_ids if i.split(":")[0] in ("Service", "Decision", "Ticket")), None)
+    anchor = anchor or next((i for i in answer_ids if i.startswith("Decision:")), None)
     person = next((i for i in answer_ids if i.startswith("Person:")), None)
     team = next((i for i in answer_ids if i.startswith("Team:")), None)
     target = person or team

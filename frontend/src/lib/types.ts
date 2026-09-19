@@ -45,7 +45,7 @@ export interface Source {
   ingested_at: string;
 }
 
-// GET /alerts row (store.py `alerts` table; `people` = owner + raiser, from the graph)
+// GET /alerts row (store.py `alerts` table; `people` = owner + raiser, from document frontmatter)
 export interface Alert {
   id: number;
   kind: "contradiction" | "stale";
@@ -62,14 +62,21 @@ export interface Alert {
 export interface IngestResult {
   source_ref: string;
   nodes_added: number;
+  // "building": the alert check is done, the graph (cognify) finishes in the background (~15–30 s)
+  graph_status?: "building" | "unchanged";
   alerts: Alert[];
   took_ms: number;
 }
 
 export interface EvalQuestion {
   q: string;
+  kind?: "multi-hop" | "single-hop" | "refusal" | "stale";
   grounded_ok: boolean;
   ref_recall: number;
+  hallucinated?: string[];
+  path_ok?: boolean | null; // null: question has no expected path
+  stale_ok?: boolean | null; // null: question has no stale decision to flag
+  answer?: string;
 }
 
 export interface EvalSummary {
@@ -79,6 +86,9 @@ export interface EvalSummary {
   hallucinated_sources: number;
   ref_recall: number;
   stale_flagged: number;
+  stale_total?: number;
+  path_ok?: number;
+  path_total?: number;
   results: EvalQuestion[]; // per-question rows from eval_runs.results_json
 }
 

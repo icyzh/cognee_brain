@@ -88,6 +88,14 @@ def _hop(h: tuple[str, str, str]) -> dict:
     return {"from": {"id": fid, "type": ft}, "rel": h[1], "to": {"id": tid, "type": tt}}
 
 
+async def ask_raw(question: str) -> dict:
+    """Plain Cognee for the side-by-side demo: default prompt, no guard / supersede / path, not logged."""
+    t0 = time.perf_counter()
+    raw = await cognee_client.ask(question, system_prompt=None)
+    refs = dict.fromkeys(c["source_ref"].removesuffix(".triples") for c in raw["chunks"] if c["source_ref"])
+    return {"answer": raw["answer"], "retrieved_refs": list(refs), "latency_ms": round((time.perf_counter() - t0) * 1000)}
+
+
 async def ask(question: str) -> dict:
     t0 = time.perf_counter()
     raw = await cognee_client.ask(question)
@@ -104,7 +112,10 @@ async def ask(question: str) -> dict:
             + [e["ref"] for e in ev if e["source"] == "adr"]
         ))
         adrs = paths._cache.get("adrs", {})
-        warnings = supersede_check(decisions, adrs)
+        warnings = supersede_check(decisions, adrs) + [
+            {"kind": "contradiction", "node": c["existing_ref"], "message": f"{c['new_ref']} contradicts {c['existing_ref']}: {c['reason']}"}
+            for c in store.contradictions_for(decisions)
+        ]
         answer = _HEADER_REF.sub(r"\1", raw["answer"])
         cited = {i.split(":", 1)[1] for i in a_ids if i.startswith("Decision:")}
         for w in warnings:  # the answer cites a stale decision as if current, without its successor

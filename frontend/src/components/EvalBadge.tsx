@@ -3,8 +3,8 @@
 import type { EvalLatest, EvalSummary } from "@/lib/types";
 import { ICON, Icon } from "./ui";
 
-const mark = (ok?: boolean) =>
-  ok === undefined ? (
+const mark = (ok?: boolean | null) =>
+  ok === undefined || ok === null ? (
     <span className="text-zinc-400">–</span>
   ) : ok ? (
     <span className="text-emerald-600 dark:text-emerald-400">✓</span>
@@ -13,15 +13,17 @@ const mark = (ok?: boolean) =>
   );
 
 const pct = (x?: number) => (x === undefined ? "–" : `${Math.round(x * 100)}%`);
+const frac = (n?: number, d?: number) => (n === undefined ? "–" : d === undefined ? `${n}` : `${n}/${d}`);
 
 function Summary({ name, s }: { name: string; s: EvalSummary | null }) {
   return (
     <tr>
       <td className="px-5 py-2.5 font-medium">{name}</td>
       <td className="px-5 py-2.5 font-mono tabular-nums">{s ? `${s.grounded_ok}/${s.total}` : "not run"}</td>
-      <td className="px-5 py-2.5 font-mono tabular-nums">{s?.hallucinated_sources ?? "–"}</td>
+      <td className="px-5 py-2.5 font-mono tabular-nums">{frac(s?.path_ok, s?.path_total)}</td>
+      <td className="px-5 py-2.5 font-mono tabular-nums">{frac(s?.stale_flagged, s?.stale_total)}</td>
       <td className="px-5 py-2.5 font-mono tabular-nums">{pct(s?.ref_recall)}</td>
-      <td className="px-5 py-2.5 font-mono tabular-nums">{s?.stale_flagged ?? "–"}</td>
+      <td className="px-5 py-2.5 font-mono tabular-nums">{s?.hallucinated_sources ?? "–"}</td>
     </tr>
   );
 }
@@ -55,9 +57,10 @@ export function EvalBadge({ data }: { data: EvalLatest | null }) {
             <tr>
               <th className={th}>Variant</th>
               <th className={th}>Grounded OK</th>
-              <th className={th}>Hallucinated</th>
-              <th className={th}>Ref recall</th>
+              <th className={th}>Verified path</th>
               <th className={th}>Stale flagged</th>
+              <th className={th}>Ref recall</th>
+              <th className={th}>Hallucinated</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -81,9 +84,13 @@ export function EvalBadge({ data }: { data: EvalLatest | null }) {
                   <td className="px-5 py-2.5 text-zinc-700 dark:text-zinc-300">{r.q}</td>
                   <td className="whitespace-nowrap px-5 py-2.5 text-center font-mono tabular-nums">
                     {mark(r.grounded_ok)} {pct(r.ref_recall)}
+                    {r.path_ok != null && <> · path {mark(r.path_ok)}</>}
+                    {r.stale_ok != null && <> · stale {mark(r.stale_ok)}</>}
                   </td>
                   <td className="whitespace-nowrap px-5 py-2.5 text-center font-mono tabular-nums">
                     {mark(b?.grounded_ok)} {pct(b?.ref_recall)}
+                    {b?.path_ok != null && <> · path {mark(b.path_ok)}</>}
+                    {b?.stale_ok != null && <> · stale {mark(b.stale_ok)}</>}
                   </td>
                 </tr>
               );
@@ -91,7 +98,7 @@ export function EvalBadge({ data }: { data: EvalLatest | null }) {
           </tbody>
         </table>
         <p className="border-t border-zinc-100 px-5 py-2.5 font-mono text-[11px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-          ✓/✗ = grounded correct · % = expected-ref recall · run {pf.run_at}
+          ✓/✗ = grounded correct · % = expected refs cited · path = verified hop path ends at the right team · run {pf.run_at}
         </p>
       </div>
     </details>

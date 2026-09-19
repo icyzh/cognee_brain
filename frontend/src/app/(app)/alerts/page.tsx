@@ -6,10 +6,11 @@ import { ALERTS_CHANGED, alerts as fetchAlerts, ingestFile } from "@/lib/api";
 import { Card, ErrorState, ICON, Icon, Pill } from "@/components/ui";
 import type { Alert, IngestResult } from "@/lib/types";
 
-const STEPS = ["parsing", "structural", "cognify", "checking contradictions"];
-// ponytail: POST /ingest is one request, so steps advance on typical timings, not server events.
-// Stream progress (SSE) from the backend if the estimate drifts.
-const STEP_AT_MS = [0, 1500, 4000, 15000];
+// POST /ingest returns after /add + the contradiction judge (~8 s, run side by side); cognify then
+// builds the graph in the background (graph_status: "building").
+const STEPS = ["parsing", "adding to Cognee", "checking contradictions"];
+// ponytail: one request, so steps advance on typical timings, not server events.
+const STEP_AT_MS = [0, 800, 3000];
 
 type Upload =
   | { kind: "idle" }
@@ -132,7 +133,7 @@ export default function AlertsPage() {
           >
             <input
               type="file"
-              accept=".md,.json,.txt"
+              accept=".md,.json"
               className="sr-only"
               disabled={upload.kind === "running"}
               onChange={(e) => {
@@ -178,7 +179,13 @@ export default function AlertsPage() {
                 <span className="font-mono">{upload.res.source_ref}</span> ingested
               </span>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {(upload.res.took_ms / 1000).toFixed(1)} s · {upload.res.nodes_added} nodes added ·{" "}
+                {(upload.res.took_ms / 1000).toFixed(1)} s ·{" "}
+                {upload.res.graph_status === "building"
+                  ? "graph updating in the background"
+                  : upload.res.graph_status === "unchanged"
+                    ? "already ingested"
+                    : `${upload.res.nodes_added} nodes added`}{" "}
+                ·{" "}
                 {upload.res.alerts.length ? (
                   <span className="font-medium text-red-600 dark:text-red-400">
                     {upload.res.alerts.length} new alert{upload.res.alerts.length > 1 && "s"}
